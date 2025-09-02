@@ -5,8 +5,13 @@ import streamlit as st
 
 from config import CONTEXT_MESSAGES, MAX_TURNS
 from model_api import call_model
-from ui_components import render_history, render_turn_banner, page_header, progress_turns
-from config import PERSONA_THEME
+from ui_components import (
+    render_history,
+    render_turn_banner,
+    page_header,
+    progress_turns,
+    render_chat_message,
+)
 from state import reset_to_start
 
 
@@ -79,15 +84,7 @@ def show(defaults: dict):
             st.session_state.awaiting_user = False
             user_msg = {"name": st.session_state.user_name or "Ansatt", "role": "employee", "content": user_text}
             st.session_state.history.append(user_msg)
-            # Immediate echo with same bubble style as history (no role label on self)
-            with st.chat_message("user", avatar=PERSONA_THEME["_you"]["avatar"]):
-                st.markdown(
-                    f"<div class='bubble bubble-right'>"
-                    f"<div class='bubble-header'>{user_msg['name']}</div>"
-                    f"<div class='bubble-content'>{user_msg['content']}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+            render_chat_message(user_msg["role"], user_msg["name"], user_msg["content"])
 
             # Automatic end trigger: user types "end scenario" (or "avslutt scenario")
             if user_text.strip().lower() in ("end scenario", "avslutt scenario"):

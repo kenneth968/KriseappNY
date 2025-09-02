@@ -1,7 +1,7 @@
 import streamlit as st
 from typing import Dict
 
-from config import PERSONA_THEME, ROLE_TO_FALLBACK_NAME, ROLE_LABEL_NB
+from config import PERSONA_THEME, ROLE_TO_FALLBACK_NAME
 
 
 def inject_css():
@@ -114,53 +114,79 @@ def _role_to_streamlit(role: str, name: str = "", user_name: str = "") -> str:
     return "assistant"
 
 
-def render_history(show_meta: bool = True):
-    user_name = st.session_state.get("user_name", "")
+def role_label(role: str) -> str:
+    return ROLE_TO_FALLBACK_NAME.get(role, role)
 
-    def theme_for(msg: Dict) -> (str, Dict):
-        role = msg.get("role", "")
-        name = (msg.get("name") or ROLE_TO_FALLBACK_NAME.get(role, "")).strip() or "_default"
-        # Map theme by role first to keep colors/icons consistent with actor type
-        role_theme_key = {
-            "customer": "Kunde",
-            "student": "Student",
-            "employee": "Kollega",
-            "bystander": "Bystander",
-            "system": "Scene",
-        }.get(role, "_default")
-        theme = PERSONA_THEME.get(role_theme_key, PERSONA_THEME["_default"])
-        if user_name and name == user_name and role == "employee":
-            theme = PERSONA_THEME["_you"]
-        return name, theme
 
-    def sanitize_name(display_name: str, role: str) -> str:
-        if not display_name:
-            return display_name
-        # If LLM returns e.g. "Kunde (Trine)", extract the inner name
-        import re
-        m = re.match(r"^(Kunde|Student|Kollega|Bystander|Scene|Forteller)\s*\(([^)]+)\)$", display_name)
-        if m:
-            return m.group(2).strip()
-        # Remove stray duplicated role labels in name like "Trine (Kunde) (kunde)"
-        display_name = re.sub(r"\s*\(kunde\)$", "", display_name, flags=re.IGNORECASE)
-        display_name = re.sub(r"\s*\(student\)$", "", display_name, flags=re.IGNORECASE)
-        display_name = re.sub(r"\s*\(kollega\)$", "", display_name, flags=re.IGNORECASE)
-        display_name = re.sub(r"\s*\(bystander\)$", "", display_name, flags=re.IGNORECASE)
+def sanitize_name(display_name: str, role: str) -> str:
+    if not display_name:
         return display_name
+    import re
 
-    def render_center_box(kind: str, content: str):
-        _, mid, _ = st.columns([1, 2, 1])
-        with mid:
-            if kind == "scene":
-                st.info(content)
-            elif kind == "result":
-                st.success(content)
-            elif kind == "feedback":
-                st.warning(content)
-            else:
-                st.info(content)
+    m = re.match(r"^(Kunde|Student|Kollega|Bystander|Scene|Forteller)\s*\(([^)]+)\)$", display_name)
+    if m:
+        return m.group(2).strip()
+    display_name = re.sub(r"\s*\(kunde\)$", "", display_name, flags=re.IGNORECASE)
+    display_name = re.sub(r"\s*\(student\)$", "", display_name, flags=re.IGNORECASE)
+    display_name = re.sub(r"\s*\(kollega\)$", "", display_name, flags=re.IGNORECASE)
+    display_name = re.sub(r"\s*\(bystander\)$", "", display_name, flags=re.IGNORECASE)
+    return display_name
 
-    # Render optional meta (hidden on chat page when show_meta=False)
+
+def render_center_box(kind: str, content: str) -> None:
+    _, mid, _ = st.columns([1, 2, 1])
+    with mid:
+        if kind == "scene":
+            st.info(content)
+        elif kind == "result":
+            st.success(content)
+        elif kind == "feedback":
+            st.warning(content)
+        else:
+            st.info(content)
+
+
+def render_chat_message(role: str, name: str, content: str) -> None:
+    user_name = st.session_state.get("user_name", "")
+    persona_name = (name or ROLE_TO_FALLBACK_NAME.get(role, "")).strip() or "_default"
+    role_theme_key = {
+        "customer": "Kunde",
+        "student": "Student",
+        "employee": "Kollega",
+        "bystander": "Bystander",
+        "system": "Scene",
+    }.get(role, "_default")
+    theme = PERSONA_THEME.get(role_theme_key, PERSONA_THEME["_default"])
+    if user_name and persona_name == user_name and role == "employee":
+        theme = PERSONA_THEME["_you"]
+
+    display_name = sanitize_name(persona_name, role)
+
+    if role == "system" and persona_name in ("Scene", "Forteller"):
+        render_center_box("scene", content)
+        return
+    if role == "system" and persona_name in ("Scenario-resultat", "Scenarioresultat"):
+        render_center_box("result", content)
+        return
+    if role == "system" and persona_name == "Tilbakemelding":
+        render_center_box("feedback", content)
+        return
+
+    streamlit_role = _role_to_streamlit(role, persona_name, user_name)
+    is_self = streamlit_role == "user"
+    header_text = display_name if is_self else f"{display_name} ({role_label(role)})"
+
+    with st.chat_message(streamlit_role, avatar=theme["avatar"]):
+        st.markdown(
+            f"<div style='color:{theme['color']}'>"
+            f"<div style='font-weight:600'>{header_text}</div>"
+            f"<div>{content}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def render_history(show_meta: bool = True) -> None:
     if show_meta:
         meta = st.session_state.get("last_meta")
         if meta:
@@ -169,45 +195,25 @@ def render_history(show_meta: bool = True):
             if meta.get("sjekkliste"):
                 _, mid, _ = st.columns([1, 2, 1])
                 with mid:
-                    st.markdown("<div style='color:#334155; font-weight:600; margin-top:4px'>Sjekkliste</div>", unsafe_allow_html=True)
+                    st.markdown(
+                        "<div style='color:#334155; font-weight:600; margin-top:4px'>Sjekkliste</div>",
+                        unsafe_allow_html=True,
+                    )
                     for item in meta.get("sjekkliste"):
                         st.markdown(f"- {item}")
             if meta.get("scenarioresultat") and isinstance(meta.get("scenarioresultat"), dict):
-                content = str(meta["scenarioresultat"].get("content", "")).strip()
-                if content:
-                    render_center_box("result", content)
+                m = meta["scenarioresultat"]
+                render_chat_message(m.get("role", "system"), m.get("name", "Scenarioresultat"), str(m.get("content", "")))
             if meta.get("tilbakemelding") and isinstance(meta.get("tilbakemelding"), dict):
-                content = str(meta["tilbakemelding"].get("content", "")).strip()
-                if content:
-                    render_center_box("feedback", content)
-
-    # Title-case display label from mapping (Kunde, Student, Kollega, ...)
-    def role_label(role: str) -> str:
-        return ROLE_TO_FALLBACK_NAME.get(role, role)
+                m = meta["tilbakemelding"]
+                render_chat_message(m.get("role", "system"), m.get("name", "Tilbakemelding"), str(m.get("content", "")))
 
     for msg in st.session_state.history:
-        role = msg.get("role", "assistant")
-        name, theme = theme_for(msg)
-        content = msg.get("content", "")
-
-        if role == "system" and name in ("Scene", "Forteller"):
-            render_center_box("scene", content)
-            continue
-
-        streamlit_role = _role_to_streamlit(role, name, user_name)
-        align_class = "bubble-right" if streamlit_role == "user" else "bubble-left"
-        display_name = sanitize_name(name, role)
-        is_self = (streamlit_role == "user")
-        header_text = display_name if is_self else f"{display_name} ({role_label(role)})"
-        with st.chat_message(streamlit_role, avatar=theme["avatar"]):
-            st.markdown(
-                f"<div class='bubble {align_class}'>"
-                f"<div class='bubble-header' style='color:{theme['color']}'>"
-                f"{header_text}</div>"
-                f"<div class='bubble-content'>{content}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+        render_chat_message(
+            msg.get("role", ""),
+            msg.get("name", ""),
+            msg.get("content", ""),
+        )
 
 
 def render_turn_banner():
