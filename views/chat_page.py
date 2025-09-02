@@ -42,22 +42,34 @@ def show(defaults: dict):
             "Vanskelighetsgrad": st.session_state.get("difficulty", ""),
         },
     )
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        if st.button("Til start", use_container_width=True):
-            st.session_state.page = "start"
-            st.rerun()
-    with col2:
-        if st.button("Nullstill", use_container_width=True):
-            reset_to_start(defaults)
-            st.rerun()
-    with col3:
+
+    with st.container():
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("Til start", use_container_width=True):
+                st.session_state.page = "start"
+                st.rerun()
+        with col2:
+            if st.button("Nullstill", use_container_width=True):
+                reset_to_start(defaults)
+                st.rerun()
+
+    st.divider()
+
+    with st.container():
         if st.session_state.get("ended"):
-            if st.button("Scenario avsluttet – Trykk her for feedback", type="primary", use_container_width=True):
+            if st.button(
+                "Scenario avsluttet – Trykk her for feedback",
+                type="primary",
+                use_container_width=True,
+            ):
                 st.session_state.page = "feedback"
                 st.rerun()
         else:
-            progress_turns(st.session_state.get("turns", 0), st.session_state.get("max_turns", MAX_TURNS))
+            progress_turns(
+                st.session_state.get("turns", 0),
+                st.session_state.get("max_turns", MAX_TURNS),
+            )
 
     # Bootstrap initial scene (use typing indicator only)
     if st.session_state.started and not st.session_state.history:

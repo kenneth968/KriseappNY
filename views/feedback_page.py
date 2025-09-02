@@ -40,17 +40,22 @@ def show(defaults: dict):
         )
 
     st.divider()
-    st.markdown("<div style='font-weight:800; font-size:1.1rem; color:#0f172a; margin: 0.3rem 0'>Hva vil du gjøre videre?</div>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1, 1])
-    with c1:
-        if st.button("Til start", use_container_width=True):
-            reset_to_start(defaults)
-            st.rerun()
-    with c2:
+    st.markdown(
+        "<div style='font-weight:800; font-size:1.1rem; color:#0f172a; margin: 0.3rem 0'>Hva vil du gjøre videre?</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.container():
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            if st.button("Til start", use_container_width=True):
+                reset_to_start(defaults)
+                st.rerun()
+        with c2:
+            if st.button("Se chat-logg", use_container_width=True):
+                st.session_state.page = "chat"
+                st.rerun()
+
         if st.button("Prøv på nytt (samme innstillinger)", use_container_width=True):
             restart_chat()
-            st.rerun()
-    with c3:
-        if st.button("Se chat-logg", use_container_width=True):
-            st.session_state.page = "chat"
             st.rerun()
