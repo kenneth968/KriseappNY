@@ -6,7 +6,7 @@ from typing import List, Dict, Optional, Literal
 import streamlit as st
 from pydantic import BaseModel, Field
 
-from config import STREAM_DELAY_SEC, MIN_STREAM_TIME_SEC
+from config import MIN_STREAM_TIME_SEC
 
 # Agents framework
 from agents import Agent, Runner
@@ -120,14 +120,12 @@ end_monitor_agent = Agent(
 def call_model(compiled_input: str, stream_placeholder: Optional[object] = None) -> List[Dict]:
     # Show typing indicator right away
     start_time = time.time()
-    typing_rendered = False
     if stream_placeholder is not None:
         stream_placeholder.markdown(
             "<div class='typing-indicator'><div class='typing-dots'>"
             "<span></span><span></span><span></span></div>Genererer svar …</div>",
             unsafe_allow_html=True,
         )
-        typing_rendered = True
 
     async def _run() -> ScenarioOutput:
         ctx = {

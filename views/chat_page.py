@@ -5,7 +5,8 @@ import streamlit as st
 
 from config import CONTEXT_MESSAGES, MAX_TURNS
 from model_api import call_model
-from ui_components import render_history, render_turn_banner
+from ui_components import render_history, render_turn_banner, page_header, progress_turns
+from config import PERSONA_THEME
 from state import reset_to_start
 
 
@@ -34,7 +35,13 @@ def _check_end(messages: List[Dict]) -> bool:
 
 
 def show(defaults: dict):
-    st.title("Kriseøvelse – Chat")
+    page_header(
+        "Kriseøvelse – Chat",
+        badges={
+            "Navn": st.session_state.get("user_name", ""),
+            "Vanskelighetsgrad": st.session_state.get("difficulty", ""),
+        },
+    )
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
         if st.button("Til start", use_container_width=True):
@@ -49,6 +56,8 @@ def show(defaults: dict):
             if st.button("Scenario avsluttet – Trykk her for feedback", type="primary", use_container_width=True):
                 st.session_state.page = "feedback"
                 st.rerun()
+        else:
+            progress_turns(st.session_state.get("turns", 0), st.session_state.get("max_turns", MAX_TURNS))
 
     # Bootstrap initial scene (use typing indicator only)
     if st.session_state.started and not st.session_state.history:
@@ -70,8 +79,15 @@ def show(defaults: dict):
             st.session_state.awaiting_user = False
             user_msg = {"name": st.session_state.user_name or "Ansatt", "role": "employee", "content": user_text}
             st.session_state.history.append(user_msg)
-            with st.chat_message("user"):
-                st.markdown(f"**{user_msg['name']}**\n{user_msg['content']}")
+            # Immediate echo with same bubble style as history (no role label on self)
+            with st.chat_message("user", avatar=PERSONA_THEME["_you"]["avatar"]):
+                st.markdown(
+                    f"<div class='bubble bubble-right'>"
+                    f"<div class='bubble-header'>{user_msg['name']}</div>"
+                    f"<div class='bubble-content'>{user_msg['content']}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
 
             # Automatic end trigger: user types "end scenario" (or "avslutt scenario")
             if user_text.strip().lower() in ("end scenario", "avslutt scenario"):

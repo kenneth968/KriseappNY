@@ -1,31 +1,25 @@
 import time
 
-# Prompt asset and models
-PROMPT_ID = "pmpt_68b54d197a30819485e9f188f780590a0e13554597870097"
-MODEL_PRIMARY = "gpt-4o-mini"  # fast mini model
-MODEL_FALLBACK = "o3-mini"      # supports reasoning params if needed
-
 # Tuning constants
 CONTEXT_MESSAGES = 24
 MAX_TURNS = 6
-# Make streaming snappy
-STREAM_DELAY_SEC = 0.0
+# Minimum perceived typing duration for UI polish
 MIN_STREAM_TIME_SEC = 0.8
 
-# UI theme constants
+# UI theme constants (aligned to palette #0fa3b1, #b5e2fa, #f9f7f3, #eddea4, #f7a072)
 PERSONA_THEME = {
-    "Kunde": {"color": "#d84a4a", "avatar": "😠"},
-    "Student": {"color": "#3b82f6", "avatar": "🎓"},
-    "Kollega": {"color": "#16a34a", "avatar": "👩‍🍳"},
-    "Bystander": {"color": "#a855f7", "avatar": "👀"},
-    "Ditt svar": {"color": "#111827", "avatar": "🫵"},
-    "_you": {"color": "#0ea5e9", "avatar": "🧑‍🍳"},
-    "Scene": {"color": "#0ea5e9", "avatar": "🎬"},
-    "Forteller": {"color": "#0ea5e9", "avatar": "🎬"},
-    "Scenario-resultat": {"color": "#10b981", "avatar": "✅"},
-    "Scenarioresultat": {"color": "#10b981", "avatar": "✅"},
-    "Tilbakemelding": {"color": "#f59e0b", "avatar": "💡"},
-    "_default": {"color": "#6b7280", "avatar": "🤖"},
+    "Kunde": {"color": "#f7a072", "avatar": "😠"},
+    "Student": {"color": "#0fa3b1", "avatar": "🎓"},
+    "Kollega": {"color": "#eddea4", "avatar": "👩‍🍳"},
+    "Bystander": {"color": "#b5e2fa", "avatar": "👀"},
+    "Ditt svar": {"color": "#0fa3b1", "avatar": "🫵"},
+    "_you": {"color": "#0fa3b1", "avatar": "🧑‍🍳"},
+    "Scene": {"color": "#eddea4", "avatar": "🎬"},
+    "Forteller": {"color": "#eddea4", "avatar": "🎬"},
+    "Scenario-resultat": {"color": "#0fa3b1", "avatar": "✅"},
+    "Scenarioresultat": {"color": "#0fa3b1", "avatar": "✅"},
+    "Tilbakemelding": {"color": "#f7a072", "avatar": "💡"},
+    "_default": {"color": "#0fa3b1", "avatar": "🤖"},
 }
 
 ROLE_TO_FALLBACK_NAME = {
@@ -35,4 +29,14 @@ ROLE_TO_FALLBACK_NAME = {
     "bystander": "Bystander",
     "user": "Ditt svar",
     "system": "Scene",
+}
+
+# Localized, lower-case role labels (Norwegian Bokmål)
+ROLE_LABEL_NB = {
+    "customer": "kunde",
+    "employee": "kollega",
+    "student": "student",
+    "bystander": "forbipasserende",
+    "system": "scene",
+    "user": "ditt svar",
 }

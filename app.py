@@ -8,7 +8,12 @@ from state import build_defaults, ensure_defaults
 
 
 # Basic page setup and styles
-st.set_page_config(page_title="Sit Kafe - Kriseovelse", page_icon="🗨️")
+st.set_page_config(
+    page_title="Sit Kafe – Kriseøvelse",
+    page_icon="☕",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 inject_css()
 
 
@@ -24,4 +29,3 @@ elif page == "chat":
     show_chat(defaults)
 else:
     show_feedback(defaults)
-
