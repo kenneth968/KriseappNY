@@ -1,0 +1,50 @@
+<style>
+:root {
+    --c-primary: #006272;
+    --c-light: #b5e2fa;
+    --c-sand: #eddea4;
+}
+
+/* Chips / badges */
+.chip {
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:4px 10px;
+    border-radius:14px;
+    font-size:12px;
+    font-weight:600;
+    border:1px solid rgba(0,0,0,0.06);
+}
+.chip-muted { background: var(--c-sand); color:#0f172a; border-color: rgba(0,0,0,0.06); }
+.chip-primary { background: var(--c-light); color:#075985; border-color: rgba(7,89,133,0.25); }
+
+/* Chat bubbles */
+.bubble {
+    max-width:780px;
+    padding:10px 12px;
+    border-radius:14px;
+    margin:6px 0;
+    box-shadow:0 2px 8px rgba(0,0,0,0.06);
+}
+.bubble-left {
+    background: var(--c-light);
+    border:1px solid var(--c-primary);
+}
+.bubble-right {
+    background: var(--c-primary);
+    border:1px solid var(--c-primary);
+    margin-left:auto;
+    color:#ffffff;
+}
+.bubble-right .bubble-header { color:#ffffff !important; }
+.bubble-header {
+    font-weight:600;
+    margin-bottom:6px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.bubble-content { line-height:1.5; color:#0f172a; }
+.bubble-right .bubble-content { color:#ffffff; }
+</style>
