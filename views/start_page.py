@@ -28,7 +28,9 @@ def show(defaults: dict):
                 )
 
             st.markdown(
-                "<div class='callout' style='color:#0f172a; margin-top:6px'>Du kan endre innstillingene senere. Navnet brukes i dialogen.</div>",
+                "<div class='callout' style='color:#0f172a; margin-top:6px'>"
+                "ℹ️ Du kan endre innstillingene senere. Navnet brukes i dialogen."
+                "</div>",
                 unsafe_allow_html=True,
             )
 
@@ -37,15 +39,24 @@ def show(defaults: dict):
         with st.container():
             b1, b2 = st.columns([1, 1])
             with b1:
-                start = st.form_submit_button("Start scenario", type="primary", use_container_width=True)
+                start = st.form_submit_button(
+                    "Start scenario",
+                    type="primary",
+                    use_container_width=True,
+                    icon=":material/play_arrow:",
+                )
             with b2:
-                reset = st.form_submit_button("Nullstill", use_container_width=True)
+                reset = st.form_submit_button(
+                    "Nullstill",
+                    use_container_width=True,
+                    icon=":material/restart_alt:",
+                )
 
-    if 'reset' in locals() and reset:
+    if "reset" in locals() and reset:
         reset_to_start(defaults)
         st.success("Tilbakestilt.")
 
-    if 'start' in locals() and start:
+    if "start" in locals() and start:
         if not (st.session_state.user_name or "").strip():
             st.warning("Skriv inn navnet ditt før du starter.")
             return
