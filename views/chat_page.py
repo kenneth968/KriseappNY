@@ -5,8 +5,13 @@ import streamlit as st
 
 from config import CONTEXT_MESSAGES, MAX_TURNS
 from model_api import call_model
-from ui_components import render_history, render_turn_banner, page_header, progress_turns
-from config import PERSONA_THEME
+from ui_components import (
+    render_history,
+    render_turn_banner,
+    page_header,
+    progress_turns,
+    render_chat_message,
+)
 from state import reset_to_start
 
 
@@ -43,33 +48,30 @@ def show(defaults: dict):
         },
     )
 
-    with st.container():
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            if st.button("Til start", use_container_width=True):
-                st.session_state.page = "start"
-                st.rerun()
-        with col2:
-            if st.button("Nullstill", use_container_width=True):
-                reset_to_start(defaults)
-                st.rerun()
+    if st.button("Til start", use_container_width=True):
+        st.session_state.page = "start"
+        st.rerun()
 
-    st.divider()
+    if st.button("Nullstill", use_container_width=True):
+        reset_to_start(defaults)
+        st.rerun()
 
-    with st.container():
-        if st.session_state.get("ended"):
+    if st.session_state.get("ended"):
+        with st.container():
+            st.success("Scenarioet er ferdig!")
             if st.button(
-                "Scenario avsluttet – Trykk her for feedback",
+                "Gi tilbakemelding",
                 type="primary",
+                icon=":material/feedback:",
                 use_container_width=True,
             ):
                 st.session_state.page = "feedback"
                 st.rerun()
-        else:
-            progress_turns(
-                st.session_state.get("turns", 0),
-                st.session_state.get("max_turns", MAX_TURNS),
-            )
+    else:
+        progress_turns(
+            st.session_state.get("turns", 0),
+            st.session_state.get("max_turns", MAX_TURNS),
+        )
 
     # Bootstrap initial scene (use typing indicator only)
     if st.session_state.started and not st.session_state.history:
@@ -91,15 +93,8 @@ def show(defaults: dict):
             st.session_state.awaiting_user = False
             user_msg = {"name": st.session_state.user_name or "Ansatt", "role": "employee", "content": user_text}
             st.session_state.history.append(user_msg)
-            # Immediate echo with same bubble style as history (no role label on self)
-            with st.chat_message("user", avatar=PERSONA_THEME["_you"]["avatar"]):
-                st.markdown(
-                    f"<div class='bubble bubble-right'>"
-                    f"<div class='bubble-header'>{user_msg['name']}</div>"
-                    f"<div class='bubble-content'>{user_msg['content']}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+            # Immediate echo using the unified renderer
+            render_chat_message(user_msg["role"], user_msg["name"], user_msg["content"])
 
             # Automatic end trigger: user types "end scenario" (or "avslutt scenario")
             if user_text.strip().lower() in ("end scenario", "avslutt scenario"):
