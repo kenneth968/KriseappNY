@@ -1,7 +1,7 @@
 import streamlit as st
 
 from state import reset_to_start, restart_chat
-from ui_components import page_header
+from ui_components import page_header, render_persona_legend
 
 
 def show(defaults: dict):
@@ -47,3 +47,5 @@ def show(defaults: dict):
             return
         restart_chat()
         st.rerun()
+
+    render_persona_legend()
