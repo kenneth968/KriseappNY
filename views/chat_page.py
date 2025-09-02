@@ -36,7 +36,11 @@ def _check_end(messages: List[Dict]) -> bool:
     if meta and meta.get("scenarioresultat") and meta.get("tilbakemelding"):
         return True
     names = {m.get("name", "") for m in messages}
-    return ("Scenario-resultat" in names) or ("Scenarioresultat" in names) or ("Tilbakemelding" in names)
+    return (
+        ("Scenario-resultat" in names)
+        or ("Scenarioresultat" in names)
+        or ("Tilbakemelding" in names)
+    )
 
 
 def show(defaults: dict):
@@ -48,13 +52,18 @@ def show(defaults: dict):
         },
     )
 
-    if st.button("Til start", use_container_width=True):
-        st.session_state.page = "start"
-        st.rerun()
-
-    if st.button("Nullstill", use_container_width=True):
-        reset_to_start(defaults)
-        st.rerun()
+    with st.container():
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            if st.button("Til start", icon=":material/home:", use_container_width=True):
+                st.session_state.page = "start"
+                st.rerun()
+        with c2:
+            if st.button(
+                "Nullstill", icon=":material/restart_alt:", use_container_width=True
+            ):
+                reset_to_start(defaults)
+                st.rerun()
 
     if st.session_state.get("ended"):
         with st.container():
@@ -91,7 +100,11 @@ def show(defaults: dict):
         user_text = st.chat_input(placeholder)
         if user_text:
             st.session_state.awaiting_user = False
-            user_msg = {"name": st.session_state.user_name or "Ansatt", "role": "employee", "content": user_text}
+            user_msg = {
+                "name": st.session_state.user_name or "Ansatt",
+                "role": "employee",
+                "content": user_text,
+            }
             st.session_state.history.append(user_msg)
             # Immediate echo using the unified renderer
             render_chat_message(user_msg["role"], user_msg["name"], user_msg["content"])

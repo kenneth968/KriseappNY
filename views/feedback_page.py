@@ -48,14 +48,20 @@ def show(defaults: dict):
     with st.container():
         c1, c2 = st.columns([1, 1])
         with c1:
-            if st.button("Til start", use_container_width=True):
+            if st.button("Til start", icon=":material/home:", use_container_width=True):
                 reset_to_start(defaults)
                 st.rerun()
         with c2:
-            if st.button("Se chat-logg", use_container_width=True):
+            if st.button(
+                "Se chat-logg", icon=":material/chat:", use_container_width=True
+            ):
                 st.session_state.page = "chat"
                 st.rerun()
 
-        if st.button("Prøv på nytt (samme innstillinger)", use_container_width=True):
+        if st.button(
+            "Prøv på nytt (samme innstillinger)",
+            icon=":material/replay:",
+            use_container_width=True,
+        ):
             restart_chat()
             st.rerun()

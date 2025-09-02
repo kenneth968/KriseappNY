@@ -1,5 +1,3 @@
-import time
-
 # Tuning constants
 CONTEXT_MESSAGES = 24
 MAX_TURNS = 6
