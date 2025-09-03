@@ -44,8 +44,10 @@ class ScenarioOutput(BaseModel):
 
 
 # Guardrail to ensure scenario inputs stay on topic
-def check_training_context(context, agent, compiled_input: str | List[Dict]) -> GuardrailFunctionOutput:
-    """Validate that the input contains scenario keywords and no disallowed content."""
+def check_training_context(
+    context, agent, compiled_input: str | List[Dict]
+) -> GuardrailFunctionOutput:
+    """Validate that the input contains expected scenario markers and no disallowed content."""
 
     if isinstance(compiled_input, list):
         text = " ".join(str(item) for item in compiled_input)
@@ -53,10 +55,17 @@ def check_training_context(context, agent, compiled_input: str | List[Dict]) -> 
         text = str(compiled_input)
 
     lowered = text.lower()
-    has_keyword = "scenario" in lowered
+    allowed_markers = [
+        "scenario",
+        "bruker",
+        "historikk",
+        "runde",
+        "vanskelighetsgrad",
+    ]
+    has_marker = any(marker in lowered for marker in allowed_markers)
     has_disallowed = any(bad in lowered for bad in ["forbidden", "disallowed"])
 
-    if has_disallowed or not has_keyword:
+    if has_disallowed or not has_marker:
         return GuardrailFunctionOutput(
             output_info="Input failed training context check.",
             tripwire_triggered=True,

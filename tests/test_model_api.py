@@ -57,7 +57,11 @@ async def _run_guardrail(text: str) -> None:
 
 
 def test_check_training_context_allows_valid_input():
-    asyncio.run(_run_guardrail("scenario: valid"))
+    asyncio.run(
+        _run_guardrail(
+            "Historikk: [] Bruker: Ola | Runde: 1/6 | Vanskelighetsgrad: Lett"
+        )
+    )
 
 
 def test_check_training_context_blocks_invalid_input():
