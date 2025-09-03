@@ -10,6 +10,7 @@ from config import MIN_STREAM_TIME_SEC
 
 # Agents framework
 from agents import Agent, Runner
+from agents.extensions.handoff_prompt import prompt_with_handoff_instructions
 
 
 class Oppdrag(BaseModel):
@@ -46,7 +47,7 @@ class ScenarioOutput(BaseModel):
 scene_agent = Agent(
     name="Scene Agent",
     handoff_description="Genererer første 'Scene'-melding",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du skriver kun ett meldingsobjekt: {name: 'Scene', role: 'system', content: <maks fire setninger>}. "
         "Beskriv hendelsen på Sit Kafe med autentiske detaljer. Skriv på norsk."
     ),
@@ -55,7 +56,7 @@ scene_agent = Agent(
 customer_agent = Agent(
     name="Kunde Agent",
     handoff_description="Skriver realistisk sint kundereplikk",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du skriver kun ett meldingsobjekt for en kunde med role 'customer'. "
         "Sett 'name' til et realistisk norsk fornavn (f.eks. Kari, Anders, Nora). "
         "Vær konkret, kort (maks fire setninger) og på norsk. Hold deg til situasjonen."
@@ -65,7 +66,7 @@ customer_agent = Agent(
 bystander_agent = Agent(
     name="Forbipasserende Agent",
     handoff_description="Legger til sjeldne kommenterer fra forbipasserende",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du skriver kun ett meldingsobjekt for en forbipasserende (role 'bystander'). Sett 'name' til et realistisk norsk fornavn. "
         "Bruk maks fire setninger. Bare når vanskelighetsgrad krever det."
     ),
@@ -74,7 +75,7 @@ bystander_agent = Agent(
 colleague_agent = Agent(
     name="Kollega Agent",
     handoff_description="Gir støtte fra en kollega ved behov",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du skriver kun ett meldingsobjekt for en kollega (role 'employee'). Sett 'name' til et realistisk norsk fornavn. "
         "Bruk maks fire setninger. Bare ved mellom/vanskelig."
     ),
@@ -84,7 +85,7 @@ colleague_agent = Agent(
 # Director agent composes the structured output
 scenario_agent = Agent(
     name="Scenarioleder",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du er scenarieleder for en kriseøvelse ved Sit Kafe. Alt på norsk. "
         "Produser et strukturert resultat med feltene oppdrag (valgfritt), sjekkliste (valgfritt), meldinger (liste), "
         "scenarioresultat (valgfritt) og tilbakemelding (valgfritt). Følg disse reglene:\n"
@@ -92,7 +93,8 @@ scenario_agent = Agent(
         "- Etter første tur: fortsett dialog mellom kunden og den ansatte. Hvis difficulty er 'Medium' eller 'Vanskelig', "
         "  inkluder av og til en forbipasserende (bystander) eller kollega (employee) med realistisk norsk navn.\n"
         "- Maks fire setninger per melding. Respekter vanskelighetsgrad og brukers navn fra konteksten.\n"
-        "- Maks seks runder totalt; ved avslutning fyll inn 'scenarioresultat' og 'tilbakemelding'."
+        "- Maks seks runder totalt; ved avslutning fyll inn 'scenarioresultat' og 'tilbakemelding'.\n"
+        "- Du kan delegere via handoffs til Scene Agent / Kunde Agent / Forbipasserende Agent / Kollega Agent for å komponere meldinger."
     ),
     handoffs=[scene_agent, customer_agent, bystander_agent, colleague_agent],
     output_type=ScenarioOutput,
@@ -127,7 +129,7 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
             unsafe_allow_html=True,
         )
 
-    async def _run() -> ScenarioOutput:
+    async def _run():
         ctx = {
             "difficulty": str(st.session_state.get("difficulty", "")),
             "user_name": str(st.session_state.get("user_name", "")),
@@ -135,9 +137,52 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
             "max_turns": str(st.session_state.get("max_turns", 6)),
         }
         result = await Runner.run(scenario_agent, compiled_input, context=ctx)
-        return result.final_output_as(ScenarioOutput)
+        return result.final_output
 
-    out: ScenarioOutput = asyncio.run(_run())
+    raw_out = asyncio.run(_run())
+
+    # Robustly coerce the agent output into ScenarioOutput
+    def _coerce_output(val) -> ScenarioOutput:
+        try:
+            if isinstance(val, ScenarioOutput):
+                return val
+            if isinstance(val, dict):
+                return ScenarioOutput(**val)
+            if isinstance(val, str):
+                try:
+                    data = json.loads(val)
+                    if isinstance(data, dict):
+                        return ScenarioOutput(**data)
+                except Exception:
+                    pass
+            # Fallback: wrap plain text into a minimal structured object
+            is_initial_local = (
+                st.session_state.get("turns", 0) == 0
+                and len(st.session_state.get("history", [])) == 0
+            )
+            msg_role = "system" if is_initial_local else "customer"
+            msg_name = "Scene" if is_initial_local else "Kunde"
+            content = str(val)
+            return ScenarioOutput(
+                oppdrag=None,
+                sjekkliste=[],
+                meldinger=[
+                    ScenarioMessage(name=msg_name, role=msg_role, content=content)
+                ],
+                scenarioresultat=None,
+                tilbakemelding=None,
+            )
+        except Exception:
+            # Final fallback: empty conversation step
+            return ScenarioOutput(
+                oppdrag=None,
+                sjekkliste=[],
+                meldinger=[],
+                scenarioresultat=None,
+                tilbakemelding=None,
+            )
+
+    out: ScenarioOutput = _coerce_output(raw_out)
 
     # Minimum indicator time for perceived streaming feel
     elapsed = time.time() - start_time
@@ -183,7 +228,22 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
             }
             monitor_input = json.dumps(summary, ensure_ascii=False)
             res = await Runner.run(end_monitor_agent, monitor_input, context=ctx)
-            return res.final_output_as(EndDecision)
+            out_val = res.final_output
+            if isinstance(out_val, EndDecision):
+                return out_val
+            if isinstance(out_val, dict):
+                try:
+                    return EndDecision(**out_val)
+                except Exception:
+                    return EndDecision(should_end=False)
+            if isinstance(out_val, str):
+                try:
+                    data = json.loads(out_val)
+                    if isinstance(data, dict):
+                        return EndDecision(**data)
+                except Exception:
+                    pass
+            return EndDecision(should_end=False)
 
         decision: EndDecision = asyncio.run(_monitor())
         if decision and decision.should_end:

@@ -69,7 +69,7 @@ def show(defaults: dict):
         with st.container():
             st.success("Scenarioet er ferdig!")
             if st.button(
-                "Gi tilbakemelding",
+                "Se tilbakemelding",
                 type="primary",
                 icon=":material/feedback:",
                 use_container_width=True,

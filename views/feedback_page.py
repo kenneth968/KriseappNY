@@ -18,26 +18,12 @@ def show(defaults: dict):
     result = meta.get("scenarioresultat")
     feedback = meta.get("tilbakemelding")
     if result and isinstance(result, dict) and result.get("content"):
-        st.markdown(
-            "<div class='callout' style='border-color: var(--c-primary); background: var(--c-light); color:#0f172a'>"
-            "✅ <b>Scenarioresultat</b><div style='margin-top:6px'></div>"
-            f"{result.get('content')}"
-            "</div>",
-            unsafe_allow_html=True,
-        )
+        st.success(f"Scenarioresultat\n\n{result.get('content')}")
     else:
-        st.markdown(
-            "<div class='callout' style='color:#0f172a'>Ingen scenarioresultat registrert ennå.</div>",
-            unsafe_allow_html=True,
-        )
+        st.info("Ingen scenarioresultat registrert ennå.")
+
     if feedback and isinstance(feedback, dict) and feedback.get("content"):
-        st.markdown(
-            "<div class='callout' style='border-color: var(--c-peach); background: var(--c-cream); color:#0f172a; margin-top:8px'>"
-            "💡 <b>Tilbakemelding</b><div style='margin-top:6px'></div>"
-            f"{feedback.get('content')}"
-            "</div>",
-            unsafe_allow_html=True,
-        )
+        st.warning(f"Tilbakemelding\n\n{feedback.get('content')}")
 
     st.divider()
     st.markdown(

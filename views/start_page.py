@@ -27,11 +27,20 @@ def show(defaults: dict):
                     value=st.session_state.get("difficulty", "Medium"),
                 )
 
-            st.markdown(
-                "<div class='callout' style='color:#0f172a; margin-top:6px'>"
-                "ℹ️ Du kan endre innstillingene senere. Navnet brukes i dialogen."
-                "</div>",
-                unsafe_allow_html=True,
+            # Use Streamlit's themed info box for better readability
+            st.info("Du kan endre innstillingene senere. Navnet brukes i dialogen.")
+
+        # Optional: allow users to provide their own OpenAI API key
+        with st.container():
+            st.session_state.api_key = st.text_input(
+                "OpenAI API-nøkkel (valgfritt)",
+                value=st.session_state.get("api_key", ""),
+                type="password",
+                placeholder="sk-...",
+                help=(
+                    "Bruk din egen nøkkel hvis appen kjører på Community Cloud. "
+                    "Nøkkelen lagres kun i denne økten."
+                ),
             )
 
         st.divider()
