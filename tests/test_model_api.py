@@ -1,7 +1,11 @@
+import asyncio
 import json
-import streamlit as st
 
-from model_api import coerce_scenario_output, ScenarioOutput
+import pytest
+import streamlit as st
+from agents import Agent, InputGuardrail, InputGuardrailTripwireTriggered, RunContextWrapper
+
+from model_api import coerce_scenario_output, ScenarioOutput, check_training_context
 
 
 def test_coerce_output_from_dict():
@@ -41,3 +45,21 @@ def test_coerce_output_fallback_plain_text_initial():
     assert msg.name == "Scene"
     assert msg.role == "system"
     assert msg.content == "uventet"
+
+
+async def _run_guardrail(text: str) -> None:
+    guardrail = InputGuardrail(guardrail_function=check_training_context)
+    ctx = RunContextWrapper(context=None)
+    agent = Agent(name="dummy", instructions="")
+    result = await guardrail.run(agent, text, ctx)
+    if result.output.tripwire_triggered:
+        raise InputGuardrailTripwireTriggered(result)
+
+
+def test_check_training_context_allows_valid_input():
+    asyncio.run(_run_guardrail("scenario: valid"))
+
+
+def test_check_training_context_blocks_invalid_input():
+    with pytest.raises(InputGuardrailTripwireTriggered):
+        asyncio.run(_run_guardrail("this is forbidden"))
