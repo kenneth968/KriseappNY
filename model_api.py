@@ -1,12 +1,12 @@
 import json
 import time
-import asyncio
 from typing import List, Dict, Optional, Literal
 
 import streamlit as st
 from pydantic import BaseModel, Field
 
 from config import MIN_STREAM_TIME_SEC
+from async_utils import run_async
 
 # Agents framework
 from agents import Agent, Runner
@@ -139,7 +139,7 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
         result = await Runner.run(scenario_agent, compiled_input, context=ctx)
         return result.final_output
 
-    raw_out = asyncio.run(_run())
+    raw_out = run_async(_run())
 
     # Robustly coerce the agent output into ScenarioOutput
     def _coerce_output(val) -> ScenarioOutput:
@@ -245,7 +245,7 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
                     pass
             return EndDecision(should_end=False)
 
-        decision: EndDecision = asyncio.run(_monitor())
+        decision: EndDecision = run_async(_monitor())
         if decision and decision.should_end:
             st.session_state.last_meta = {
                 "oppdrag": (out.oppdrag.beskrivelse if out.oppdrag else None),
