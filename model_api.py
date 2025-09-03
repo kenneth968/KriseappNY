@@ -119,6 +119,54 @@ end_monitor_agent = Agent(
 )
 
 
+def coerce_scenario_output(val) -> ScenarioOutput:
+    """Coerce various return types into a ``ScenarioOutput`` instance.
+
+    Accepts ``ScenarioOutput`` objects, raw dicts, JSON strings or plain text.
+    On invalid input a minimal structured fallback is produced so callers can
+    rely on receiving a valid ``ScenarioOutput``.
+    """
+    try:
+        if isinstance(val, ScenarioOutput):
+            return val
+        if isinstance(val, dict):
+            return ScenarioOutput(**val)
+        if isinstance(val, str):
+            try:
+                data = json.loads(val)
+                if isinstance(data, dict):
+                    return ScenarioOutput(**data)
+            except Exception:
+                pass
+
+        # Fallback: wrap plain text into a minimal structured object
+        is_initial_local = (
+            st.session_state.get("turns", 0) == 0
+            and len(st.session_state.get("history", [])) == 0
+        )
+        msg_role = "system" if is_initial_local else "customer"
+        msg_name = "Scene" if is_initial_local else "Kunde"
+        content = str(val)
+        return ScenarioOutput(
+            oppdrag=None,
+            sjekkliste=[],
+            meldinger=[
+                ScenarioMessage(name=msg_name, role=msg_role, content=content)
+            ],
+            scenarioresultat=None,
+            tilbakemelding=None,
+        )
+    except Exception:
+        # Final fallback: empty conversation step
+        return ScenarioOutput(
+            oppdrag=None,
+            sjekkliste=[],
+            meldinger=[],
+            scenarioresultat=None,
+            tilbakemelding=None,
+        )
+
+
 def call_model(compiled_input: str, stream_placeholder: Optional[object] = None) -> List[Dict]:
     # Show typing indicator right away
     start_time = time.time()
@@ -142,47 +190,7 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
     raw_out = run_async(_run())
 
     # Robustly coerce the agent output into ScenarioOutput
-    def _coerce_output(val) -> ScenarioOutput:
-        try:
-            if isinstance(val, ScenarioOutput):
-                return val
-            if isinstance(val, dict):
-                return ScenarioOutput(**val)
-            if isinstance(val, str):
-                try:
-                    data = json.loads(val)
-                    if isinstance(data, dict):
-                        return ScenarioOutput(**data)
-                except Exception:
-                    pass
-            # Fallback: wrap plain text into a minimal structured object
-            is_initial_local = (
-                st.session_state.get("turns", 0) == 0
-                and len(st.session_state.get("history", [])) == 0
-            )
-            msg_role = "system" if is_initial_local else "customer"
-            msg_name = "Scene" if is_initial_local else "Kunde"
-            content = str(val)
-            return ScenarioOutput(
-                oppdrag=None,
-                sjekkliste=[],
-                meldinger=[
-                    ScenarioMessage(name=msg_name, role=msg_role, content=content)
-                ],
-                scenarioresultat=None,
-                tilbakemelding=None,
-            )
-        except Exception:
-            # Final fallback: empty conversation step
-            return ScenarioOutput(
-                oppdrag=None,
-                sjekkliste=[],
-                meldinger=[],
-                scenarioresultat=None,
-                tilbakemelding=None,
-            )
-
-    out: ScenarioOutput = _coerce_output(raw_out)
+    out: ScenarioOutput = coerce_scenario_output(raw_out)
 
     # Minimum indicator time for perceived streaming feel
     elapsed = time.time() - start_time
