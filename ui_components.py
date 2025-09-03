@@ -2,59 +2,45 @@ import random
 import streamlit as st
 from typing import Dict
 
+from streamlit_extras.stylable_container import stylable_container
+from streamlit_extras.badges import badge as _badge
+
 from config import PERSONA_THEME, ROLE_TO_FALLBACK_NAME, ROLE_LABEL_NB
 
 
-def inject_css():
-    # Keep only the minimal CSS for the pulsing turn indicator.
-    st.markdown(
-        """
-        <style>
-        .turn-indicator {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 12px;
-            border-radius: 10px;
-            background: #eddea4; /* sand */
-            border: 1px solid #f7a072; /* peach */
-            color: #7a3c10; /* dark brown text for contrast */
-            font-weight: 600;
-            width: fit-content;
-            margin: 6px auto 12px auto;
-            box-shadow: 0 0 0 0 rgba(247,160,114, 0.4);
-            animation: pulseGlow 1.6s ease-in-out infinite;
+def styled_container(key: str, css: str):
+    """Thin wrapper around ``stylable_container`` to centralize styling."""
+    return stylable_container(key=key, css_styles=css)
+
+
+def external_badge(kind: str, name: str | None = None, url: str | None = None) -> None:
+    """Render an external badge (e.g., GitHub, PyPI)."""
+    _badge(kind, name=name, url=url)
+
+
+def chip(label: str, value: str) -> None:
+    """Render a small inline badge for key-value pairs."""
+    css = """
+        div[data-testid="stStylableContainer"] {
+            display:inline-block;
+            padding:2px 8px;
+            border-radius:10px;
+            background:#f1f5f9;
+            color:#334155;
+            font-size:0.8rem;
+            margin-right:4px;
         }
-        .turn-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #f7a072; /* peach */
-            box-shadow: 0 0 0 0 rgba(247,160,114, 0.6);
-            animation: dotPulse 1.6s ease-in-out infinite;
-        }
-        @keyframes pulseGlow {
-            0% { box-shadow: 0 0 0 0 rgba(247,160,114, 0.4); }
-            70% { box-shadow: 0 0 0 12px rgba(247,160,114, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(247,160,114, 0); }
-        }
-        @keyframes dotPulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.35); }
-            100% { transform: scale(1); }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """
+    with styled_container(f"chip-{label}", css):
+        st.markdown(f"{label}: **{value}**")
 
 def page_header(title: str, subtitle: str = "", badges: Dict[str, str] | None = None) -> None:
-    st.markdown(f"<div class='app-title'>{title}</div>", unsafe_allow_html=True)
+    st.markdown(f"### {title}")
     if subtitle:
-        st.markdown(f"<div class='app-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
+        st.markdown(f"#### {subtitle}")
     if badges:
-        chips = " ".join([f"<span class='chip chip-muted'>{k}: <b>{v}</b></span>" for k, v in badges.items()])
-        st.markdown(chips, unsafe_allow_html=True)
+        for k, v in badges.items():
+            chip(k, str(v))
 
 
 def progress_turns(turns: int, max_turns: int) -> None:
@@ -190,10 +176,11 @@ def render_history(show_meta: bool = True) -> None:
             if meta.get("sjekkliste"):
                 _, mid, _ = st.columns([1, 2, 1])
                 with mid:
-                    st.markdown(
-                        "<div style='color:#334155; font-weight:600; margin-top:4px'>Sjekkliste</div>",
-                        unsafe_allow_html=True,
-                    )
+                    with styled_container(
+                        "checklist-header",
+                        "div[data-testid='stStylableContainer'] {color:#334155;font-weight:600;margin-top:4px;}",
+                    ):
+                        st.markdown("Sjekkliste")
                     for item in meta.get("sjekkliste"):
                         st.markdown(f"- {item}")
             if meta.get("scenarioresultat") and isinstance(meta.get("scenarioresultat"), dict):
@@ -212,7 +199,40 @@ def render_history(show_meta: bool = True) -> None:
 
 
 def render_turn_banner():
-    st.markdown(
-        "<div class='turn-indicator'><div class='turn-dot'></div>Din tur</div>",
-        unsafe_allow_html=True,
-    )
+    css = """
+    div[data-testid="stStylableContainer"] {
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:10px 12px;
+        border-radius:10px;
+        background:#eddea4;
+        border:1px solid #f7a072;
+        color:#7a3c10;
+        font-weight:600;
+        width:fit-content;
+        margin:6px auto 12px auto;
+        box-shadow:0 0 0 0 rgba(247,160,114,0.4);
+        animation:pulseGlow 1.6s ease-in-out infinite;
+    }
+    div[data-testid="stStylableContainer"] .dot {
+        width:10px;
+        height:10px;
+        border-radius:50%;
+        background:#f7a072;
+        box-shadow:0 0 0 0 rgba(247,160,114,0.6);
+        animation:dotPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulseGlow {
+        0% { box-shadow:0 0 0 0 rgba(247,160,114,0.4); }
+        70% { box-shadow:0 0 0 12px rgba(247,160,114,0); }
+        100% { box-shadow:0 0 0 0 rgba(247,160,114,0); }
+    }
+    @keyframes dotPulse {
+        0% { transform:scale(1); }
+        50% { transform:scale(1.35); }
+        100% { transform:scale(1); }
+    }
+    """
+    with styled_container("turn-indicator", css):
+        st.markdown("<div class='dot'></div>Din tur", unsafe_allow_html=True)
