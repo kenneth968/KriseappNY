@@ -115,6 +115,8 @@ def _is_generic_name(name: str, role: str) -> bool:
         "ditt svar", "ansatt",
     }
     fallback = ROLE_TO_FALLBACK_NAME.get(role, "").strip().lower()
+    if role == "customer" and "kunde" in n:
+        return True
     return n in generic or (fallback and n == fallback.lower())
 
 
@@ -159,10 +161,19 @@ def render_chat_message(role: str, name: str, content: str) -> None:
 
     streamlit_role = _role_to_streamlit(role, persona_name, user_name)
     is_self = streamlit_role == "user"
+
+    descriptor = None
+    if role == "customer":
+        lower_disp = display_name.strip().lower()
+        if "kunde" in lower_disp:
+            descriptor = lower_disp if lower_disp != "kunde" else None
+            display_name = ""
+
     # If the model gave us a generic name like "kunde", replace with a random Norwegian name
     if not is_self and _is_generic_name(display_name, role):
         display_name = _get_or_create_role_random_name(role)
-    header_text = display_name if is_self else f"{display_name} ({role_label(role)})"
+
+    header_text = display_name if is_self else f"{display_name} ({descriptor or role_label(role)})"
 
     with st.chat_message(streamlit_role, avatar=theme["avatar"]):
         # Use Streamlit's default theme colors for readability
