@@ -1,15 +1,17 @@
 import json
+import re
 import time
-import asyncio
 from typing import List, Dict, Optional, Literal
 
 import streamlit as st
 from pydantic import BaseModel, Field
 
 from config import MIN_STREAM_TIME_SEC
+from async_utils import run_async
 
 # Agents framework
-from agents import Agent, Runner
+from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
+from agents.extensions.handoff_prompt import prompt_with_handoff_instructions
 
 
 class Oppdrag(BaseModel):
@@ -42,11 +44,42 @@ class ScenarioOutput(BaseModel):
     tilbakemelding: Optional[ScenarioFeedback] = None
 
 
+# Guardrail to ensure scenario inputs stay on topic
+def check_training_context(
+    context, agent, compiled_input: str | List[Dict]
+) -> GuardrailFunctionOutput:
+    """Validate that the input contains expected scenario markers and no disallowed content."""
+
+    if isinstance(compiled_input, list):
+        text = " ".join(str(item) for item in compiled_input)
+    else:
+        text = str(compiled_input)
+
+    lowered = text.lower()
+    allowed_markers = [
+        "scenario",
+        "bruker",
+        "historikk",
+        "runde",
+        "vanskelighetsgrad",
+    ]
+    has_marker = any(marker in lowered for marker in allowed_markers)
+    has_disallowed = any(bad in lowered for bad in ["forbidden", "disallowed"])
+
+    if has_disallowed or not has_marker:
+        return GuardrailFunctionOutput(
+            output_info="Input failed training context check.",
+            tripwire_triggered=True,
+        )
+
+    return GuardrailFunctionOutput(output_info="ok", tripwire_triggered=False)
+
+
 # Persona agents (configurable, available for handoff)
 scene_agent = Agent(
     name="Scene Agent",
     handoff_description="Genererer første 'Scene'-melding",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du skriver kun ett meldingsobjekt: {name: 'Scene', role: 'system', content: <maks fire setninger>}. "
         "Beskriv hendelsen på Sit Kafe med autentiske detaljer. Skriv på norsk."
     ),
@@ -55,7 +88,7 @@ scene_agent = Agent(
 customer_agent = Agent(
     name="Kunde Agent",
     handoff_description="Skriver realistisk sint kundereplikk",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du skriver kun ett meldingsobjekt for en kunde med role 'customer'. "
         "Sett 'name' til et realistisk norsk fornavn (f.eks. Kari, Anders, Nora). "
         "Vær konkret, kort (maks fire setninger) og på norsk. Hold deg til situasjonen."
@@ -65,7 +98,7 @@ customer_agent = Agent(
 bystander_agent = Agent(
     name="Forbipasserende Agent",
     handoff_description="Legger til sjeldne kommenterer fra forbipasserende",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du skriver kun ett meldingsobjekt for en forbipasserende (role 'bystander'). Sett 'name' til et realistisk norsk fornavn. "
         "Bruk maks fire setninger. Bare når vanskelighetsgrad krever det."
     ),
@@ -74,7 +107,7 @@ bystander_agent = Agent(
 colleague_agent = Agent(
     name="Kollega Agent",
     handoff_description="Gir støtte fra en kollega ved behov",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du skriver kun ett meldingsobjekt for en kollega (role 'employee'). Sett 'name' til et realistisk norsk fornavn. "
         "Bruk maks fire setninger. Bare ved mellom/vanskelig."
     ),
@@ -84,17 +117,19 @@ colleague_agent = Agent(
 # Director agent composes the structured output
 scenario_agent = Agent(
     name="Scenarioleder",
-    instructions=(
+    instructions=prompt_with_handoff_instructions(
         "Du er scenarieleder for en kriseøvelse ved Sit Kafe. Alt på norsk. "
         "Produser et strukturert resultat med feltene oppdrag (valgfritt), sjekkliste (valgfritt), meldinger (liste), "
         "scenarioresultat (valgfritt) og tilbakemelding (valgfritt). Følg disse reglene:\n"
-        "- Første tur (turn_count == 0): returner kun to meldinger i rekkefølge: Scene (system) og en sint kunde (customer).\n"
+        "- Første tur (turn_count == 0): returner to meldinger: Scene (system) laget av Scene Agent og en sint kunde (customer) laget av Kunde Agent med realistisk norsk fornavn.\n"
         "- Etter første tur: fortsett dialog mellom kunden og den ansatte. Hvis difficulty er 'Medium' eller 'Vanskelig', "
         "  inkluder av og til en forbipasserende (bystander) eller kollega (employee) med realistisk norsk navn.\n"
         "- Maks fire setninger per melding. Respekter vanskelighetsgrad og brukers navn fra konteksten.\n"
-        "- Maks seks runder totalt; ved avslutning fyll inn 'scenarioresultat' og 'tilbakemelding'."
+        "- Maks seks runder totalt; ved avslutning fyll inn 'scenarioresultat' og 'tilbakemelding'.\n"
+        "- Du kan delegere via handoffs til Scene Agent / Kunde Agent / Forbipasserende Agent / Kollega Agent for å komponere meldinger."
     ),
     handoffs=[scene_agent, customer_agent, bystander_agent, colleague_agent],
+    input_guardrails=[InputGuardrail(guardrail_function=check_training_context)],
     output_type=ScenarioOutput,
 )
 
@@ -117,6 +152,85 @@ end_monitor_agent = Agent(
 )
 
 
+def coerce_scenario_output(val) -> ScenarioOutput:
+    """Coerce various return types into a ``ScenarioOutput`` instance.
+
+    Accepts ``ScenarioOutput`` objects, raw dicts, JSON strings or plain text.
+    On invalid input a minimal structured fallback is produced so callers can
+    rely on receiving a valid ``ScenarioOutput``.
+    """
+    try:
+        if isinstance(val, ScenarioOutput):
+            return val
+        if isinstance(val, dict):
+            return ScenarioOutput(**val)
+        if isinstance(val, str):
+            cleaned = val.strip()
+            cleaned = re.sub(r"^```\w*\n|```$", "", cleaned)
+            cleaned = cleaned.strip().strip("`")
+            data = None
+            try:
+                data = json.loads(cleaned)
+            except Exception:
+                try:
+                    import ast
+
+                    data = ast.literal_eval(cleaned)
+                except Exception:
+                    data = None
+            if isinstance(data, dict):
+                # Either a full ScenarioOutput or a single message object
+                if {"name", "role", "content"} <= set(data.keys()):
+                    msg = ScenarioMessage(**data)
+                    return ScenarioOutput(
+                        oppdrag=None,
+                        sjekkliste=[],
+                        meldinger=[msg],
+                        scenarioresultat=None,
+                        tilbakemelding=None,
+                    )
+                return ScenarioOutput(**data)
+            if isinstance(data, list):
+                try:
+                    msgs = [ScenarioMessage(**m) for m in data if isinstance(m, dict)]
+                    return ScenarioOutput(
+                        oppdrag=None,
+                        sjekkliste=[],
+                        meldinger=msgs,
+                        scenarioresultat=None,
+                        tilbakemelding=None,
+                    )
+                except Exception:
+                    pass
+
+        # Fallback: wrap plain text into a minimal structured object
+        is_initial_local = (
+            st.session_state.get("turns", 0) == 0
+            and len(st.session_state.get("history", [])) == 0
+        )
+        msg_role = "system" if is_initial_local else "customer"
+        msg_name = "Scene" if is_initial_local else "Kunde"
+        content = str(val)
+        return ScenarioOutput(
+            oppdrag=None,
+            sjekkliste=[],
+            meldinger=[
+                ScenarioMessage(name=msg_name, role=msg_role, content=content)
+            ],
+            scenarioresultat=None,
+            tilbakemelding=None,
+        )
+    except Exception:
+        # Final fallback: empty conversation step
+        return ScenarioOutput(
+            oppdrag=None,
+            sjekkliste=[],
+            meldinger=[],
+            scenarioresultat=None,
+            tilbakemelding=None,
+        )
+
+
 def call_model(compiled_input: str, stream_placeholder: Optional[object] = None) -> List[Dict]:
     # Show typing indicator right away
     start_time = time.time()
@@ -127,7 +241,7 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
             unsafe_allow_html=True,
         )
 
-    async def _run() -> ScenarioOutput:
+    async def _run():
         ctx = {
             "difficulty": str(st.session_state.get("difficulty", "")),
             "user_name": str(st.session_state.get("user_name", "")),
@@ -135,9 +249,12 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
             "max_turns": str(st.session_state.get("max_turns", 6)),
         }
         result = await Runner.run(scenario_agent, compiled_input, context=ctx)
-        return result.final_output_as(ScenarioOutput)
+        return result.final_output
 
-    out: ScenarioOutput = asyncio.run(_run())
+    raw_out = run_async(_run())
+
+    # Robustly coerce the agent output into ScenarioOutput
+    out: ScenarioOutput = coerce_scenario_output(raw_out)
 
     # Minimum indicator time for perceived streaming feel
     elapsed = time.time() - start_time
@@ -183,9 +300,24 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
             }
             monitor_input = json.dumps(summary, ensure_ascii=False)
             res = await Runner.run(end_monitor_agent, monitor_input, context=ctx)
-            return res.final_output_as(EndDecision)
+            out_val = res.final_output
+            if isinstance(out_val, EndDecision):
+                return out_val
+            if isinstance(out_val, dict):
+                try:
+                    return EndDecision(**out_val)
+                except Exception:
+                    return EndDecision(should_end=False)
+            if isinstance(out_val, str):
+                try:
+                    data = json.loads(out_val)
+                    if isinstance(data, dict):
+                        return EndDecision(**data)
+                except Exception:
+                    pass
+            return EndDecision(should_end=False)
 
-        decision: EndDecision = asyncio.run(_monitor())
+        decision: EndDecision = run_async(_monitor())
         if decision and decision.should_end:
             st.session_state.last_meta = {
                 "oppdrag": (out.oppdrag.beskrivelse if out.oppdrag else None),

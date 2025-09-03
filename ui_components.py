@@ -1,101 +1,46 @@
+import random
 import streamlit as st
 from typing import Dict
 
-from config import PERSONA_THEME, ROLE_TO_FALLBACK_NAME
+from streamlit_extras.stylable_container import stylable_container
+from streamlit_extras.badges import badge as _badge
+
+from config import PERSONA_THEME, ROLE_TO_FALLBACK_NAME, ROLE_LABEL_NB
 
 
-def inject_css():
-    st.markdown(
-        """
-        <style>
-        :root {
-            --c-primary: #0fa3b1; /* teal */
-            --c-light: #b5e2fa;   /* light blue */
-            --c-cream: #f9f7f3;   /* warm off-white */
-            --c-sand: #eddea4;    /* sand */
-            --c-peach: #f7a072;   /* peach */
+def styled_container(key: str, css: str):
+    """Thin wrapper around ``stylable_container`` to centralize styling."""
+    return stylable_container(key=key, css_styles=css)
+
+
+def external_badge(kind: str, name: str | None = None, url: str | None = None) -> None:
+    """Render an external badge (e.g., GitHub, PyPI)."""
+    _badge(kind, name=name, url=url)
+
+
+def chip(label: str, value: str) -> None:
+    """Render a small inline badge for key-value pairs."""
+    css = """
+        div[data-testid="stStylableContainer"] {
+            display:inline-block;
+            padding:2px 8px;
+            border-radius:10px;
+            background:#f1f5f9;
+            color:#334155;
+            font-size:0.8rem;
+            margin-right:4px;
         }
-        /* Base layout polish (less top space, avoid pure white) */
-        .stApp { background: linear-gradient(180deg, var(--c-light) 0%, var(--c-cream) 32%, var(--c-cream) 100%); }
-        .block-container { max-width: 1000px; padding-top: 0.2rem !important; padding-bottom: 1.4rem; }
-        header, #MainMenu, footer { visibility: hidden; height: 0 !important; }
-        /* Headings */
-        .app-title { font-size: 1.6rem; font-weight: 800; color: #0f172a; margin: 0.25rem 0 0.1rem 0; }
-        .app-subtitle { color: #334155; margin-bottom: 0.6rem; }
-        /* Chips / badges */
-        .chip { display:inline-flex; align-items:center; gap:8px; padding:4px 10px; border-radius:14px; font-size:12px; font-weight:600; border:1px solid rgba(0,0,0,0.06); }
-        .chip-muted { background: var(--c-sand); color:#0f172a; border-color: rgba(0,0,0,0.06); }
-        .chip-primary { background: var(--c-light); color:#075985; border-color: rgba(7,89,133,0.25); }
-        /* Turn banner */
-        .turn-indicator { 
-            display:flex; align-items:center; gap:8px; padding:10px 12px; 
-            border-radius:10px; background: var(--c-sand); border:1px solid var(--c-peach); 
-            color:#7a3c10; font-weight:600; width:fit-content; margin:6px auto 12px auto; 
-            box-shadow: 0 0 0 0 rgba(247,160,114, 0.4);
-            animation: pulseGlow 1.6s ease-in-out infinite;
-        }
-        .turn-dot { width:10px; height:10px; border-radius:50%; background: var(--c-peach); 
-            box-shadow: 0 0 0 0 rgba(247,160,114, 0.6); animation: dotPulse 1.6s ease-in-out infinite;
-        }
-        @keyframes pulseGlow { 0% { box-shadow: 0 0 0 0 rgba(247,160,114, 0.4);} 70% { box-shadow: 0 0 0 12px rgba(247,160,114, 0);} 100% { box-shadow: 0 0 0 0 rgba(247,160,114, 0);} }
-        @keyframes dotPulse { 0% { transform: scale(1);} 50% { transform: scale(1.35);} 100% { transform: scale(1);} }
-        .typing-indicator { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:12px; background: var(--c-cream); color:#374151; border:1px solid var(--c-sand); margin: 4px 0; }
-        .typing-dots span { display:inline-block; width:6px; height:6px; margin-right:4px; border-radius:50%; background:#6b7280; animation: blink 1.2s infinite ease-in-out; }
-        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
-        /* Chat bubbles */
-        .bubble { max-width: 780px; padding: 10px 12px; border-radius: 14px; margin: 6px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-        .bubble-left { background: var(--c-light); border: 1px solid var(--c-primary); }
-        .bubble-right { background: var(--c-primary); border: 1px solid var(--c-primary); margin-left: auto; color: #ffffff; }
-        .bubble-right .bubble-header { color: #ffffff !important; }
-        .bubble-header { font-weight: 600; margin-bottom: 6px; display:flex; align-items:center; gap:8px; }
-        .role-badge { font-size: 11px; padding: 2px 6px; border-radius: 8px; background: var(--c-cream); color: #374151; border: 1px solid var(--c-sand); }
-        .bubble-content { line-height: 1.5; color: #0f172a; }
-        .bubble-right .bubble-content { color: #ffffff; }
-        /* Card helpers */
-        .callout { border: 1px solid var(--c-sand); background: var(--c-cream); border-radius: 12px; padding: 12px 14px; }
-        /* Buttons: ensure strong contrast */
-        .stButton > button, button[kind] {
-            border-radius: 10px !important;
-            border: 1px solid var(--c-primary) !important;
-            background: var(--c-cream) !important;
-            color: #0f172a !important;
-        }
-        .stButton > button:hover { filter: brightness(0.96); }
-        [data-testid="baseButton-secondary"] { background: var(--c-cream) !important; color: #0f172a !important; border: 1px solid var(--c-primary) !important; }
-        [data-testid="baseButton-primary"], .stButton > button[kind="primary"] {
-            background: var(--c-primary) !important; color: #ffffff !important; border-color: var(--c-primary) !important;
-        }
-        [data-testid="baseButton-primary"]:hover, .stButton > button[kind="primary"]:hover { filter: brightness(0.95); }
-        /* Inputs / textareas */
-        input, textarea { color: #0f172a !important; }
-        ::placeholder { color: var(--c-primary) !important; opacity: 1; }
-        /* Labels */
-        [data-testid="stWidgetLabel"] p { color: #0f172a !important; font-weight: 700; }
-        /* Text input backgrounds & borders */
-        [data-testid="stTextInputRootElement"] input { background: #ffffff !important; border: 1px solid var(--c-primary) !important; border-radius: 10px !important; }
-        /* Slider and radio theming (best-effort) */
-        [data-testid="stSlider"] [role="slider"] { background: var(--c-primary) !important; border: 2px solid var(--c-primary) !important; }
-        [data-testid="stSlider"] .st-bz, [data-testid="stSlider"] .st-c0, [data-testid="stSlider"] .st-c1 { background: var(--c-primary) !important; }
-        [data-testid="stRadio"] label { background: var(--c-cream); color: #0f172a; border: 1px solid var(--c-primary); padding: 6px 10px; border-radius: 12px; margin-right: 6px; }
-        /* Progress bar */
-        [data-testid="stProgressBar"] p { color: #0f172a !important; font-weight: 700; }
-        [data-testid="stProgressBar"] div > div { background-color: var(--c-primary) !important; }
-        /* Headings contrast */
-        h1, h2, h3 { color: #0f172a !important; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """
+    with styled_container(f"chip-{label}", css):
+        st.markdown(f"{label}: **{value}**")
 
 def page_header(title: str, subtitle: str = "", badges: Dict[str, str] | None = None) -> None:
-    st.markdown(f"<div class='app-title'>{title}</div>", unsafe_allow_html=True)
+    st.markdown(f"### {title}")
     if subtitle:
-        st.markdown(f"<div class='app-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
+        st.markdown(f"#### {subtitle}")
     if badges:
-        chips = " ".join([f"<span class='chip chip-muted'>{k}: <b>{v}</b></span>" for k, v in badges.items()])
-        st.markdown(chips, unsafe_allow_html=True)
+        for k, v in badges.items():
+            chip(k, str(v))
 
 
 def progress_turns(turns: int, max_turns: int) -> None:
@@ -112,7 +57,8 @@ def _role_to_streamlit(role: str, name: str = "", user_name: str = "") -> str:
 
 
 def role_label(role: str) -> str:
-    return ROLE_TO_FALLBACK_NAME.get(role, role)
+    # Prefer localized, lowercase labels for parentheses, e.g., (kunde)
+    return ROLE_LABEL_NB.get(role, role)
 
 
 def sanitize_name(display_name: str, role: str) -> str:
@@ -128,6 +74,36 @@ def sanitize_name(display_name: str, role: str) -> str:
     display_name = re.sub(r"\s*\(kollega\)$", "", display_name, flags=re.IGNORECASE)
     display_name = re.sub(r"\s*\(bystander\)$", "", display_name, flags=re.IGNORECASE)
     return display_name
+
+
+# Simple Norwegian name pool used when models return generic role names
+_NB_NAMES = [
+    "Kari", "Nora", "Anders", "Lars", "Ola", "Knut", "Mari", "Anne",
+    "Ingrid", "Hanne", "Sigrid", "Eirik", "Per", "Kjetil", "Morten",
+    "Jon", "Silje", "Hilde", "Trine", "Camilla",
+]
+
+
+def _get_or_create_role_random_name(role: str) -> str:
+    key = "_rand_name_" + (role or "")
+    if key not in st.session_state:
+        st.session_state[key] = random.choice(_NB_NAMES)
+    return st.session_state[key]
+
+
+def _is_generic_name(name: str, role: str) -> bool:
+    if not name:
+        return True
+    n = str(name).strip().lower()
+    generic = {
+        "kunde", "customer", "kollega", "employee", "medarbeider", "bystander",
+        "forbipasserende", "student", "scene", "forteller", "system", "user",
+        "ditt svar", "ansatt",
+    }
+    fallback = ROLE_TO_FALLBACK_NAME.get(role, "").strip().lower()
+    if role == "customer" and "kunde" in n:
+        return True
+    return n in generic or (fallback and n == fallback.lower())
 
 
 def render_center_box(kind: str, content: str) -> None:
@@ -171,16 +147,24 @@ def render_chat_message(role: str, name: str, content: str) -> None:
 
     streamlit_role = _role_to_streamlit(role, persona_name, user_name)
     is_self = streamlit_role == "user"
-    header_text = display_name if is_self else f"{display_name} ({role_label(role)})"
+
+    descriptor = None
+    if role == "customer":
+        lower_disp = display_name.strip().lower()
+        if "kunde" in lower_disp:
+            descriptor = lower_disp if lower_disp != "kunde" else None
+            display_name = ""
+
+    # If the model gave us a generic name like "kunde", replace with a random Norwegian name
+    if not is_self and _is_generic_name(display_name, role):
+        display_name = _get_or_create_role_random_name(role)
+
+    header_text = display_name if is_self else f"{display_name} ({descriptor or role_label(role)})"
 
     with st.chat_message(streamlit_role, avatar=theme["avatar"]):
-        st.markdown(
-            f"<div style='color:{theme['color']}'>"
-            f"<div style='font-weight:600'>{header_text}</div>"
-            f"<div>{content}</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
+        # Use Streamlit's default theme colors for readability
+        st.markdown(f"**{header_text}**")
+        st.markdown(content)
 
 
 def render_history(show_meta: bool = True) -> None:
@@ -192,10 +176,11 @@ def render_history(show_meta: bool = True) -> None:
             if meta.get("sjekkliste"):
                 _, mid, _ = st.columns([1, 2, 1])
                 with mid:
-                    st.markdown(
-                        "<div style='color:#334155; font-weight:600; margin-top:4px'>Sjekkliste</div>",
-                        unsafe_allow_html=True,
-                    )
+                    with styled_container(
+                        "checklist-header",
+                        "div[data-testid='stStylableContainer'] {color:#334155;font-weight:600;margin-top:4px;}",
+                    ):
+                        st.markdown("Sjekkliste")
                     for item in meta.get("sjekkliste"):
                         st.markdown(f"- {item}")
             if meta.get("scenarioresultat") and isinstance(meta.get("scenarioresultat"), dict):
@@ -214,7 +199,40 @@ def render_history(show_meta: bool = True) -> None:
 
 
 def render_turn_banner():
-    st.markdown(
-        f"<div class='turn-indicator'><div class='turn-dot'></div>Din tur til å handle, {st.session_state.get('user_name','')}.</div>",
-        unsafe_allow_html=True,
-    )
+    css = """
+    div[data-testid="stStylableContainer"] {
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:10px 12px;
+        border-radius:10px;
+        background:#eddea4;
+        border:1px solid #f7a072;
+        color:#7a3c10;
+        font-weight:600;
+        width:fit-content;
+        margin:6px auto 12px auto;
+        box-shadow:0 0 0 0 rgba(247,160,114,0.4);
+        animation:pulseGlow 1.6s ease-in-out infinite;
+    }
+    div[data-testid="stStylableContainer"] .dot {
+        width:10px;
+        height:10px;
+        border-radius:50%;
+        background:#f7a072;
+        box-shadow:0 0 0 0 rgba(247,160,114,0.6);
+        animation:dotPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulseGlow {
+        0% { box-shadow:0 0 0 0 rgba(247,160,114,0.4); }
+        70% { box-shadow:0 0 0 12px rgba(247,160,114,0); }
+        100% { box-shadow:0 0 0 0 rgba(247,160,114,0); }
+    }
+    @keyframes dotPulse {
+        0% { transform:scale(1); }
+        50% { transform:scale(1.35); }
+        100% { transform:scale(1); }
+    }
+    """
+    with styled_container("turn-indicator", css):
+        st.markdown("<div class='dot'></div>Din tur", unsafe_allow_html=True)

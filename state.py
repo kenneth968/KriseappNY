@@ -16,6 +16,7 @@ def build_defaults() -> Dict[str, Any]:
         "ended": False,
         "started": False,
         "user_name": "",
+        "api_key": st.session_state.get("api_key", ""),
         "turns": 0,
         "awaiting_user": False,
         "last_meta": {},
@@ -56,4 +57,3 @@ def restart_chat() -> None:
     st.session_state.started = True
     st.session_state.awaiting_user = True
     st.session_state.page = "chat"
-

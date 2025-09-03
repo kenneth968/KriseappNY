@@ -1,6 +1,6 @@
 import streamlit as st
 from state import reset_to_start, restart_chat
-from ui_components import page_header
+from ui_components import page_header, chip
 
 
 def show(defaults: dict):
@@ -9,41 +9,21 @@ def show(defaults: dict):
     turns = st.session_state.get("turns", 0)
     diff = st.session_state.get("difficulty", "")
 
-    st.markdown(
-        f"<div class='chip chip-primary' style='margin-right:8px;'>Runder brukt: <b>{turns}</b></div>"
-        f"<div class='chip chip-muted'>Vanskelighetsgrad: <b>{diff}</b></div>",
-        unsafe_allow_html=True,
-    )
+    chip("Runder brukt", str(turns))
+    chip("Vanskelighetsgrad", str(diff))
 
     result = meta.get("scenarioresultat")
     feedback = meta.get("tilbakemelding")
     if result and isinstance(result, dict) and result.get("content"):
-        st.markdown(
-            "<div class='callout' style='border-color: var(--c-primary); background: var(--c-light); color:#0f172a'>"
-            "✅ <b>Scenarioresultat</b><div style='margin-top:6px'></div>"
-            f"{result.get('content')}"
-            "</div>",
-            unsafe_allow_html=True,
-        )
+        st.success(f"Scenarioresultat\n\n{result.get('content')}")
     else:
-        st.markdown(
-            "<div class='callout' style='color:#0f172a'>Ingen scenarioresultat registrert ennå.</div>",
-            unsafe_allow_html=True,
-        )
+        st.info("Ingen scenarioresultat registrert ennå.")
+
     if feedback and isinstance(feedback, dict) and feedback.get("content"):
-        st.markdown(
-            "<div class='callout' style='border-color: var(--c-peach); background: var(--c-cream); color:#0f172a; margin-top:8px'>"
-            "💡 <b>Tilbakemelding</b><div style='margin-top:6px'></div>"
-            f"{feedback.get('content')}"
-            "</div>",
-            unsafe_allow_html=True,
-        )
+        st.warning(f"Tilbakemelding\n\n{feedback.get('content')}")
 
     st.divider()
-    st.markdown(
-        "<div style='font-weight:800; font-size:1.1rem; color:#0f172a; margin: 0.3rem 0'>Hva vil du gjøre videre?</div>",
-        unsafe_allow_html=True,
-    )
+    st.subheader("Hva vil du gjøre videre?")
 
     with st.container():
         c1, c2 = st.columns([1, 1])
