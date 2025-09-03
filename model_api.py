@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from typing import List, Dict, Optional, Literal
 
@@ -164,14 +165,17 @@ def coerce_scenario_output(val) -> ScenarioOutput:
         if isinstance(val, dict):
             return ScenarioOutput(**val)
         if isinstance(val, str):
+            cleaned = val.strip()
+            cleaned = re.sub(r"^```\w*\n|```$", "", cleaned)
+            cleaned = cleaned.strip().strip("`")
             data = None
             try:
-                data = json.loads(val)
+                data = json.loads(cleaned)
             except Exception:
                 try:
                     import ast
 
-                    data = ast.literal_eval(val)
+                    data = ast.literal_eval(cleaned)
                 except Exception:
                     data = None
             if isinstance(data, dict):

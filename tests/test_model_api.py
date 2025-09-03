@@ -36,6 +36,21 @@ def test_coerce_output_from_json_string():
     assert out.meldinger[0].content == "hei"
 
 
+def test_coerce_output_from_code_fenced_json():
+    st.session_state.clear()
+    data = {
+        "meldinger": [
+            {"name": "Scene", "role": "system", "content": "hei"}
+        ]
+    }
+    json_str = json.dumps(data)
+    fenced = f"```json\n{json_str}\n```"
+    out = coerce_scenario_output(fenced)
+    assert isinstance(out, ScenarioOutput)
+    assert len(out.meldinger) == 1
+    assert out.meldinger[0].content == "hei"
+
+
 def test_coerce_output_fallback_plain_text_initial():
     st.session_state.clear()
     out = coerce_scenario_output("uventet")
