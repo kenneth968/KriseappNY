@@ -120,7 +120,7 @@ scenario_agent = Agent(
         "Du er scenarieleder for en kriseøvelse ved Sit Kafe. Alt på norsk. "
         "Produser et strukturert resultat med feltene oppdrag (valgfritt), sjekkliste (valgfritt), meldinger (liste), "
         "scenarioresultat (valgfritt) og tilbakemelding (valgfritt). Følg disse reglene:\n"
-        "- Første tur (turn_count == 0): returner kun to meldinger i rekkefølge: Scene (system) og en sint kunde (customer).\n"
+        "- Første tur (turn_count == 0): returner to meldinger: Scene (system) laget av Scene Agent og en sint kunde (customer) laget av Kunde Agent med realistisk norsk fornavn.\n"
         "- Etter første tur: fortsett dialog mellom kunden og den ansatte. Hvis difficulty er 'Medium' eller 'Vanskelig', "
         "  inkluder av og til en forbipasserende (bystander) eller kollega (employee) med realistisk norsk navn.\n"
         "- Maks fire setninger per melding. Respekter vanskelighetsgrad og brukers navn fra konteksten.\n"
@@ -164,12 +164,40 @@ def coerce_scenario_output(val) -> ScenarioOutput:
         if isinstance(val, dict):
             return ScenarioOutput(**val)
         if isinstance(val, str):
+            data = None
             try:
                 data = json.loads(val)
-                if isinstance(data, dict):
-                    return ScenarioOutput(**data)
             except Exception:
-                pass
+                try:
+                    import ast
+
+                    data = ast.literal_eval(val)
+                except Exception:
+                    data = None
+            if isinstance(data, dict):
+                # Either a full ScenarioOutput or a single message object
+                if {"name", "role", "content"} <= set(data.keys()):
+                    msg = ScenarioMessage(**data)
+                    return ScenarioOutput(
+                        oppdrag=None,
+                        sjekkliste=[],
+                        meldinger=[msg],
+                        scenarioresultat=None,
+                        tilbakemelding=None,
+                    )
+                return ScenarioOutput(**data)
+            if isinstance(data, list):
+                try:
+                    msgs = [ScenarioMessage(**m) for m in data if isinstance(m, dict)]
+                    return ScenarioOutput(
+                        oppdrag=None,
+                        sjekkliste=[],
+                        meldinger=msgs,
+                        scenarioresultat=None,
+                        tilbakemelding=None,
+                    )
+                except Exception:
+                    pass
 
         # Fallback: wrap plain text into a minimal structured object
         is_initial_local = (
