@@ -2,6 +2,17 @@ import streamlit as st
 
 from state import reset_to_start, restart_chat
 from ui_components import page_header
+from streamlit_extras.stylable_container import stylable_container
+from streamlit_extras.badges import badge
+
+BLOCK_STYLE = """
+    {
+        border: 1px solid rgba(49, 51, 63, 0.2);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        background-color: rgba(49, 51, 63, 0.05);
+    }
+"""
 
 
 def show(defaults: dict):
@@ -9,9 +20,10 @@ def show(defaults: dict):
         "Kriseøvelse – Sit Kafe",
         "Tren på å håndtere krevende kundedialoger i et trygt miljø.",
     )
+    badge("streamlit", url="https://streamlit.io")
 
     with st.form("start-form", clear_on_submit=False):
-        with st.container():
+        with stylable_container(key="name_difficulty", css_styles=BLOCK_STYLE):
             c1, c2 = st.columns([1, 1])
             with c1:
                 st.session_state.user_name = st.text_input(
@@ -27,11 +39,14 @@ def show(defaults: dict):
                     value=st.session_state.get("difficulty", "Medium"),
                 )
 
-            # Use Streamlit's themed info box for better readability
-            st.info("Du kan endre innstillingene senere. Navnet brukes i dialogen.")
+            st.status(
+                "Du kan endre innstillingene senere. Navnet brukes i dialogen.",
+                state="complete",
+                expanded=False,
+            )
 
         # Optional: allow users to provide their own OpenAI API key
-        with st.container():
+        with stylable_container(key="api_key_block", css_styles=BLOCK_STYLE):
             st.session_state.api_key = st.text_input(
                 "OpenAI API-nøkkel (valgfritt)",
                 value=st.session_state.get("api_key", ""),
