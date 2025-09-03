@@ -1,38 +1,57 @@
 import random
-import streamlit as st
+from contextlib import contextmanager
 from typing import Dict
 
-from streamlit_extras.stylable_container import stylable_container
-from streamlit_extras.badges import badge as _badge
+import streamlit as st
 
 from config import PERSONA_THEME, ROLE_TO_FALLBACK_NAME, ROLE_LABEL_NB
 
 
+def _normalize_css(css: str) -> str:
+    """Return inline style without surrounding braces."""
+    style = css.strip()
+    if style.startswith("{") and style.endswith("}"):
+        style = style[1:-1]
+    return style
+
+
+@contextmanager
 def styled_container(key: str, css: str):
-    """Thin wrapper around ``stylable_container`` to centralize styling."""
-    return stylable_container(key=key, css_styles=css)
+    """Context manager applying inline CSS to a container.
+
+    ``key`` is kept for API compatibility but unused.
+    """
+    style = _normalize_css(css)
+    container = st.container()
+    container.markdown(f"<div style=\"{style}\">", unsafe_allow_html=True)
+    with container:
+        yield container
+    container.markdown("</div>", unsafe_allow_html=True)
 
 
 def external_badge(kind: str, name: str | None = None, url: str | None = None) -> None:
-    """Render an external badge (e.g., GitHub, PyPI)."""
-    _badge(kind, name=name, url=url)
+    """Render a simple clickable badge without ``streamlit-extras``."""
+    label = name or kind
+    href = f' href="{url}" target="_blank"' if url else ""
+    st.markdown(
+        f"<a{href} style='text-decoration:none;'>"
+        f"<span style='display:inline-block;padding:2px 8px;border-radius:10px;"
+        f"background:#f1f5f9;color:#334155;font-size:0.8rem;margin-right:4px;'>"
+        f"{label}</span></a>",
+        unsafe_allow_html=True,
+    )
 
 
 def chip(label: str, value: str) -> None:
     """Render a small inline badge for key-value pairs."""
-    css = """
-        div[data-testid="stStylableContainer"] {
-            display:inline-block;
-            padding:2px 8px;
-            border-radius:10px;
-            background:#f1f5f9;
-            color:#334155;
-            font-size:0.8rem;
-            margin-right:4px;
-        }
-    """
-    with styled_container(f"chip-{label}", css):
-        st.markdown(f"{label}: **{value}**")
+    style = (
+        "display:inline-block;padding:2px 8px;border-radius:10px;"
+        "background:#f1f5f9;color:#334155;font-size:0.8rem;margin-right:4px;"
+    )
+    st.markdown(
+        f"<span style='{style}'>{label}: <strong>{value}</strong></span>",
+        unsafe_allow_html=True,
+    )
 
 def page_header(title: str, subtitle: str = "", badges: Dict[str, str] | None = None) -> None:
     st.markdown(f"### {title}")
@@ -176,11 +195,10 @@ def render_history(show_meta: bool = True) -> None:
             if meta.get("sjekkliste"):
                 _, mid, _ = st.columns([1, 2, 1])
                 with mid:
-                    with styled_container(
-                        "checklist-header",
-                        "div[data-testid='stStylableContainer'] {color:#334155;font-weight:600;margin-top:4px;}",
-                    ):
-                        st.markdown("Sjekkliste")
+                    st.markdown(
+                        "<p style='color:#334155;font-weight:600;margin-top:4px;'>Sjekkliste</p>",
+                        unsafe_allow_html=True,
+                    )
                     for item in meta.get("sjekkliste"):
                         st.markdown(f"- {item}")
             if meta.get("scenarioresultat") and isinstance(meta.get("scenarioresultat"), dict):
@@ -198,41 +216,49 @@ def render_history(show_meta: bool = True) -> None:
         )
 
 
-def render_turn_banner():
-    css = """
-    div[data-testid="stStylableContainer"] {
-        display:flex;
-        align-items:center;
-        gap:8px;
-        padding:10px 12px;
-        border-radius:10px;
-        background:#eddea4;
-        border:1px solid #f7a072;
-        color:#7a3c10;
-        font-weight:600;
-        width:fit-content;
-        margin:6px auto 12px auto;
-        box-shadow:0 0 0 0 rgba(247,160,114,0.4);
-        animation:pulseGlow 1.6s ease-in-out infinite;
-    }
-    div[data-testid="stStylableContainer"] .dot {
-        width:10px;
-        height:10px;
-        border-radius:50%;
-        background:#f7a072;
-        box-shadow:0 0 0 0 rgba(247,160,114,0.6);
-        animation:dotPulse 1.6s ease-in-out infinite;
-    }
-    @keyframes pulseGlow {
-        0% { box-shadow:0 0 0 0 rgba(247,160,114,0.4); }
-        70% { box-shadow:0 0 0 12px rgba(247,160,114,0); }
-        100% { box-shadow:0 0 0 0 rgba(247,160,114,0); }
-    }
-    @keyframes dotPulse {
-        0% { transform:scale(1); }
-        50% { transform:scale(1.35); }
-        100% { transform:scale(1); }
-    }
-    """
-    with styled_container("turn-indicator", css):
-        st.markdown("<div class='dot'></div>Din tur", unsafe_allow_html=True)
+def render_turn_banner() -> None:
+    """Display a banner indicating the user's turn."""
+    st.markdown(
+        """
+        <style>
+        .turn-banner {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            padding:10px 12px;
+            border-radius:10px;
+            background:#eddea4;
+            border:1px solid #f7a072;
+            color:#7a3c10;
+            font-weight:600;
+            width:fit-content;
+            margin:6px auto 12px auto;
+            box-shadow:0 0 0 0 rgba(247,160,114,0.4);
+            animation:pulseGlow 1.6s ease-in-out infinite;
+        }
+        .turn-banner .dot {
+            width:10px;
+            height:10px;
+            border-radius:50%;
+            background:#f7a072;
+            box-shadow:0 0 0 0 rgba(247,160,114,0.6);
+            animation:dotPulse 1.6s ease-in-out infinite;
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow:0 0 0 0 rgba(247,160,114,0.4); }
+            70% { box-shadow:0 0 0 12px rgba(247,160,114,0); }
+            100% { box-shadow:0 0 0 0 rgba(247,160,114,0); }
+        }
+        @keyframes dotPulse {
+            0% { transform:scale(1); }
+            50% { transform:scale(1.35); }
+            100% { transform:scale(1); }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div class='turn-banner'><span class='dot'></span>Din tur</div>",
+        unsafe_allow_html=True,
+    )

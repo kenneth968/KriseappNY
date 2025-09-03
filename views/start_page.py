@@ -1,9 +1,7 @@
 import streamlit as st
 
 from state import reset_to_start, restart_chat
-from ui_components import page_header
-from streamlit_extras.stylable_container import stylable_container
-from streamlit_extras.badges import badge
+from ui_components import page_header, styled_container, external_badge
 
 BLOCK_STYLE = """
     {
@@ -20,10 +18,10 @@ def show(defaults: dict):
         "Kriseøvelse – Sit Kafe",
         "Tren på å håndtere krevende kundedialoger i et trygt miljø.",
     )
-    badge("streamlit", url="https://streamlit.io")
+    external_badge("streamlit", url="https://streamlit.io")
 
     with st.form("start-form", clear_on_submit=False):
-        with stylable_container(key="name_difficulty", css_styles=BLOCK_STYLE):
+        with styled_container(key="name_difficulty", css=BLOCK_STYLE):
             c1, c2 = st.columns([1, 1])
             with c1:
                 st.session_state.user_name = st.text_input(
@@ -46,7 +44,7 @@ def show(defaults: dict):
             )
 
         # Optional: allow users to provide their own OpenAI API key
-        with stylable_container(key="api_key_block", css_styles=BLOCK_STYLE):
+        with styled_container(key="api_key_block", css=BLOCK_STYLE):
             st.session_state.api_key = st.text_input(
                 "OpenAI API-nøkkel (valgfritt)",
                 value=st.session_state.get("api_key", ""),
