@@ -9,7 +9,7 @@ from config import MIN_STREAM_TIME_SEC
 from async_utils import run_async
 
 # Agents framework
-from agents import Agent, Runner
+from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
 from agents.extensions.handoff_prompt import prompt_with_handoff_instructions
 
 
@@ -41,6 +41,28 @@ class ScenarioOutput(BaseModel):
     meldinger: List[ScenarioMessage]
     scenarioresultat: Optional[ScenarioResult] = None
     tilbakemelding: Optional[ScenarioFeedback] = None
+
+
+# Guardrail to ensure scenario inputs stay on topic
+def check_training_context(context, agent, compiled_input: str | List[Dict]) -> GuardrailFunctionOutput:
+    """Validate that the input contains scenario keywords and no disallowed content."""
+
+    if isinstance(compiled_input, list):
+        text = " ".join(str(item) for item in compiled_input)
+    else:
+        text = str(compiled_input)
+
+    lowered = text.lower()
+    has_keyword = "scenario" in lowered
+    has_disallowed = any(bad in lowered for bad in ["forbidden", "disallowed"])
+
+    if has_disallowed or not has_keyword:
+        return GuardrailFunctionOutput(
+            output_info="Input failed training context check.",
+            tripwire_triggered=True,
+        )
+
+    return GuardrailFunctionOutput(output_info="ok", tripwire_triggered=False)
 
 
 # Persona agents (configurable, available for handoff)
@@ -97,6 +119,7 @@ scenario_agent = Agent(
         "- Du kan delegere via handoffs til Scene Agent / Kunde Agent / Forbipasserende Agent / Kollega Agent for å komponere meldinger."
     ),
     handoffs=[scene_agent, customer_agent, bystander_agent, colleague_agent],
+    input_guardrails=[InputGuardrail(guardrail_function=check_training_context)],
     output_type=ScenarioOutput,
 )
 
