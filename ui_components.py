@@ -79,10 +79,17 @@ def progress_turns(turns: int, max_turns: int) -> None:
 
 
 def _role_to_streamlit(role: str, name: str = "", user_name: str = "") -> str:
-    if role == "employee" and name and name == user_name:
-        return "user"
+    """Map our semantic roles to Streamlit chat roles.
+
+    Align the employee (the human user) to the right even if name casing/spacing differs.
+    """
     if role == "user":
         return "user"
+    if role == "employee":
+        n = (name or "").strip().lower()
+        u = (user_name or "").strip().lower()
+        if u and n == u:
+            return "user"
     return "assistant"
 def role_label(role: str) -> str:
     # Prefer localized, lowercase labels for parentheses, e.g., (kunde)
