@@ -86,7 +86,15 @@ def show(defaults: dict):
     # Bootstrap initial scene (use typing indicator only)
     if st.session_state.started and not st.session_state.history:
         compiled = _build_input(f"Start scenen for {st.session_state.user_name}.")
+        typing = st.empty()
+        typing.markdown(
+            "<div class='typing-indicator'><span>Jobber</span> "
+            "<span class='typing-dots'><span></span><span></span><span></span></span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         initial = call_model(compiled)
+        typing.empty()
         # Stream initial messages
         for m in initial:
             # Stream non-system messages; render system (scene) normally
@@ -137,7 +145,15 @@ def show(defaults: dict):
 
             st.session_state.turns += 1
             compiled = _build_input(user_text)
+            typing = st.empty()
+            typing.markdown(
+                "<div class='typing-indicator'><span>Jobber</span> "
+                "<span class='typing-dots'><span></span><span></span><span></span></span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
             ai_messages = call_model(compiled)
+            typing.empty()
             # Stream AI messages as they arrive
             for m in ai_messages:
                 if m.get("role") == "system" and m.get("name") in ("Scenario-resultat", "Scenarioresultat", "Tilbakemelding"):

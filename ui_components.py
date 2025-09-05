@@ -7,10 +7,39 @@ from config import PERSONA_THEME, ROLE_TO_FALLBACK_NAME, ROLE_LABEL_NB
 
 
 def inject_css():
-    # Minimal CSS for pulsing turn indicator.
+    # Minimal CSS for typing indicator and turn banner.
     st.markdown(
         """
         <style>
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 10px;
+            background: #f9f7f3; /* off-white */
+            border: 1px solid #b5e2fa; /* light blue */
+            color: #334155; /* slate */
+            font-weight: 600;
+            width: fit-content;
+            margin: 6px auto 8px auto;
+        }
+        .typing-dots { display: inline-flex; gap: 3px; }
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #334155;
+            display: inline-block;
+            animation: typingBlink 1.2s ease-in-out infinite;
+        }
+        .typing-dots span:nth-child(2) { animation-delay: .2s; }
+        .typing-dots span:nth-child(3) { animation-delay: .4s; }
+        @keyframes typingBlink {
+            0% { opacity: .2; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-2px); }
+            100% { opacity: .2; transform: translateY(0); }
+        }
         .turn-indicator {
             display: flex;
             align-items: center;
