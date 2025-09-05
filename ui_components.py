@@ -237,9 +237,6 @@ def render_history(show_meta: bool = True) -> None:
             msg.get("name", ""),
             msg.get("content", ""),
         )
-<<<<<<< HEAD
-
-
 def render_turn_banner() -> None:
     """Display a banner indicating the user's turn."""
     st.markdown(
