@@ -1,5 +1,4 @@
 import random
-from contextlib import contextmanager
 from typing import Dict
 
 import streamlit as st
@@ -7,59 +6,85 @@ import streamlit as st
 from config import PERSONA_THEME, ROLE_TO_FALLBACK_NAME, ROLE_LABEL_NB
 
 
-def _normalize_css(css: str) -> str:
-    """Return inline style without surrounding braces."""
-    style = css.strip()
-    if style.startswith("{") and style.endswith("}"):
-        style = style[1:-1]
-    return style
-
-
-@contextmanager
-def styled_container(key: str, css: str):
-    """Context manager applying inline CSS to a container.
-
-    ``key`` is kept for API compatibility but unused.
-    """
-    style = _normalize_css(css)
-    container = st.container()
-    container.markdown(f"<div style=\"{style}\">", unsafe_allow_html=True)
-    with container:
-        yield container
-    container.markdown("</div>", unsafe_allow_html=True)
-
-
-def external_badge(kind: str, name: str | None = None, url: str | None = None) -> None:
-    """Render a simple clickable badge without ``streamlit-extras``."""
-    label = name or kind
-    href = f' href="{url}" target="_blank"' if url else ""
+def inject_css():
+    # Minimal CSS for pulsing turn indicator and typing dots.
     st.markdown(
-        f"<a{href} style='text-decoration:none;'>"
-        f"<span style='display:inline-block;padding:2px 8px;border-radius:10px;"
-        f"background:#f1f5f9;color:#334155;font-size:0.8rem;margin-right:4px;'>"
-        f"{label}</span></a>",
-        unsafe_allow_html=True,
-    )
-
-
-def chip(label: str, value: str) -> None:
-    """Render a small inline badge for key-value pairs."""
-    style = (
-        "display:inline-block;padding:2px 8px;border-radius:10px;"
-        "background:#f1f5f9;color:#334155;font-size:0.8rem;margin-right:4px;"
-    )
-    st.markdown(
-        f"<span style='{style}'>{label}: <strong>{value}</strong></span>",
+        """
+        <style>
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 10px;
+            background: #f9f7f3; /* off-white */
+            border: 1px solid #b5e2fa; /* light blue */
+            color: #334155; /* slate */
+            font-weight: 600;
+            width: fit-content;
+            margin: 6px auto 8px auto;
+        }
+        .typing-dots { display: inline-flex; gap: 3px; }
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #334155;
+            display: inline-block;
+            animation: typingBlink 1.2s ease-in-out infinite;
+        }
+        .typing-dots span:nth-child(2) { animation-delay: .2s; }
+        .typing-dots span:nth-child(3) { animation-delay: .4s; }
+        @keyframes typingBlink {
+            0% { opacity: .2; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-2px); }
+            100% { opacity: .2; transform: translateY(0); }
+        }
+        .turn-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #eddea4; /* sand */
+            border: 1px solid #f7a072; /* peach */
+            color: #7a3c10; /* dark brown text for contrast */
+            font-weight: 600;
+            width: fit-content;
+            margin: 6px auto 12px auto;
+            box-shadow: 0 0 0 0 rgba(247,160,114, 0.4);
+            animation: pulseGlow 1.6s ease-in-out infinite;
+        }
+        .turn-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #f7a072; /* peach */
+            box-shadow: 0 0 0 0 rgba(247,160,114, 0.6);
+            animation: dotPulse 1.6s ease-in-out infinite;
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 0 0 rgba(247,160,114, 0.4); }
+            70% { box-shadow: 0 0 0 12px rgba(247,160,114, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(247,160,114, 0); }
+        }
+        @keyframes dotPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.35); }
+            100% { transform: scale(1); }
+        }
+        </style>
+        """,
         unsafe_allow_html=True,
     )
 
 def page_header(title: str, subtitle: str = "", badges: Dict[str, str] | None = None) -> None:
-    st.markdown(f"### {title}")
+    st.markdown(f"<div class='app-title'>{title}</div>", unsafe_allow_html=True)
     if subtitle:
-        st.markdown(f"#### {subtitle}")
+        st.markdown(f"<div class='app-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
     if badges:
-        for k, v in badges.items():
-            chip(k, str(v))
+        chips = " ".join([f"<span class='chip chip-muted'>{k}: <b>{v}</b></span>" for k, v in badges.items()])
+        st.markdown(chips, unsafe_allow_html=True)
 
 
 def progress_turns(turns: int, max_turns: int) -> None:
@@ -73,8 +98,6 @@ def _role_to_streamlit(role: str, name: str = "", user_name: str = "") -> str:
     if role == "user":
         return "user"
     return "assistant"
-
-
 def role_label(role: str) -> str:
     # Prefer localized, lowercase labels for parentheses, e.g., (kunde)
     return ROLE_LABEL_NB.get(role, role)
@@ -167,18 +190,18 @@ def render_chat_message(role: str, name: str, content: str) -> None:
     streamlit_role = _role_to_streamlit(role, persona_name, user_name)
     is_self = streamlit_role == "user"
 
-    descriptor = None
-    if role == "customer":
-        lower_disp = display_name.strip().lower()
-        if "kunde" in lower_disp:
-            descriptor = lower_disp if lower_disp != "kunde" else None
-            display_name = ""
-
-    # If the model gave us a generic name like "kunde", replace with a random Norwegian name
-    if not is_self and _is_generic_name(display_name, role):
-        display_name = _get_or_create_role_random_name(role)
-
-    header_text = display_name if is_self else f"{display_name} ({descriptor or role_label(role)})"
+    # Stabilize persona names across the session to avoid mid-run renaming.
+    if not is_self:
+        fixed_key = f"_fixed_name_{role}"
+        fixed = st.session_state.get(fixed_key)
+        if fixed:
+            display_name = fixed
+        else:
+            if _is_generic_name(display_name, role):
+                display_name = _get_or_create_role_random_name(role)
+            # Persist the first seen non-generic or chosen fallback as the fixed name
+            st.session_state[fixed_key] = display_name
+    header_text = display_name if is_self else f"{display_name} ({role_label(role)})"
 
     with st.chat_message(streamlit_role, avatar=theme["avatar"]):
         # Use Streamlit's default theme colors for readability
@@ -214,6 +237,7 @@ def render_history(show_meta: bool = True) -> None:
             msg.get("name", ""),
             msg.get("content", ""),
         )
+<<<<<<< HEAD
 
 
 def render_turn_banner() -> None:

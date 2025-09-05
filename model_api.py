@@ -80,8 +80,12 @@ scene_agent = Agent(
     name="Scene Agent",
     handoff_description="Genererer første 'Scene'-melding",
     instructions=prompt_with_handoff_instructions(
-        "Du skriver kun ett meldingsobjekt: {name: 'Scene', role: 'system', content: <maks fire setninger>}. "
-        "Beskriv hendelsen på Sit Kafe med autentiske detaljer. Skriv på norsk."
+        "Output: nøyaktig ÉN meldingsobjekt (ikke liste), som JSON/dict, "
+        "med {name: 'Scene', role: 'system', content: <2–4 setninger>}. "
+        "Skriv på norsk (Bokmål), uten meta-tekst, ingen kodeblokker. "
+        "Innhold: sett scenen på Sit Kafe her og nå (presens), med 1–2 konkrete og troverdige detaljer (f.eks. travle morgenminutter, lukt av kaffe, søl, lang kø, feil bestilling, allergi, betalingsproblem). "
+        "Ikke nevn spesifikke personnavn; bruk nøytrale betegnelser som 'kunden' og 'kollega'. "
+        "Ikke løs konflikten; kun etablér situasjonen kort."
     ),
 )
 
@@ -89,9 +93,12 @@ customer_agent = Agent(
     name="Kunde Agent",
     handoff_description="Skriver realistisk sint kundereplikk",
     instructions=prompt_with_handoff_instructions(
-        "Du skriver kun ett meldingsobjekt for en kunde med role 'customer'. "
-        "Sett 'name' til et realistisk norsk fornavn (f.eks. Kari, Anders, Nora). "
-        "Vær konkret, kort (maks fire setninger) og på norsk. Hold deg til situasjonen."
+        "Output: nøyaktig ÉN meldingsobjekt (ikke liste), som JSON/dict, for en kunde med role 'customer'. "
+        "Sett 'name' til et realistisk norsk fornavn (f.eks. Kari, Anders, Nora, Ola, Mari, Jon, Ingrid). "
+        "Innhold: 1–4 setninger på norsk, konkret og relevant for scenen. "
+        "Inkluder minst én spesifikk detalj (bestilling, ventetid, pris, kvittering, søl, allergi, tidspunkt). "
+        "Kalibrer styrke etter 'difficulty' i konteksten: Lett = irritert men saklig; Medium = bestemt og utålmodig; Vanskelig = hevet stemme, avbryter og stiller krav (uten trusler). "
+        "Ikke løs situasjonen, ikke metakommentarer, ingen emojis."
     ),
 )
 
@@ -99,8 +106,11 @@ bystander_agent = Agent(
     name="Forbipasserende Agent",
     handoff_description="Legger til sjeldne kommenterer fra forbipasserende",
     instructions=prompt_with_handoff_instructions(
-        "Du skriver kun ett meldingsobjekt for en forbipasserende (role 'bystander'). Sett 'name' til et realistisk norsk fornavn. "
-        "Bruk maks fire setninger. Bare når vanskelighetsgrad krever det."
+        "Output: nøyaktig ÉN meldingsobjekt (ikke liste) for en forbipasserende med role 'bystander'. "
+        "Sett 'name' til et realistisk norsk fornavn. 1–3 setninger, norsk. "
+        "Tone: observatør. Kommentér kort og troverdig på det som skjer, uten å ta over samtalen. "
+        "Medium: kan mildt støtte eller be om ro; Vanskelig: kan uttrykke utålmodighet eller legge press, men aldri bli truende eller grov. "
+        "Ingen metatekst, ingen løsninger på egne vegne."
     ),
 )
 
@@ -108,8 +118,10 @@ colleague_agent = Agent(
     name="Kollega Agent",
     handoff_description="Gir støtte fra en kollega ved behov",
     instructions=prompt_with_handoff_instructions(
-        "Du skriver kun ett meldingsobjekt for en kollega (role 'employee'). Sett 'name' til et realistisk norsk fornavn. "
-        "Bruk maks fire setninger. Bare ved mellom/vanskelig."
+        "Output: nøyaktig ÉN meldingsobjekt (ikke liste) fra en kollega med role 'employee'. "
+        "Sett 'name' til et realistisk norsk fornavn som IKKE er lik 'user_name' i konteksten. 1–3 setninger, norsk. "
+        "Støtt den ansatte høflig: tilby konkret hjelp (sjekke kvittering, hente ny drikk, tilkalle leder), holde ro, avklare misforståelser. "
+        "Ikke overstyr kunden eller den ansatte, ikke løft saker du ikke har mandat til, ingen metatekst. Bare ved Medium/Vanskelig."
     ),
 )
 
@@ -118,15 +130,17 @@ colleague_agent = Agent(
 scenario_agent = Agent(
     name="Scenarioleder",
     instructions=prompt_with_handoff_instructions(
-        "Du er scenarieleder for en kriseøvelse ved Sit Kafe. Alt på norsk. "
-        "Produser et strukturert resultat med feltene oppdrag (valgfritt), sjekkliste (valgfritt), meldinger (liste), "
-        "scenarioresultat (valgfritt) og tilbakemelding (valgfritt). Følg disse reglene:\n"
-        "- Første tur (turn_count == 0): returner to meldinger: Scene (system) laget av Scene Agent og en sint kunde (customer) laget av Kunde Agent med realistisk norsk fornavn.\n"
-        "- Etter første tur: fortsett dialog mellom kunden og den ansatte. Hvis difficulty er 'Medium' eller 'Vanskelig', "
-        "  inkluder av og til en forbipasserende (bystander) eller kollega (employee) med realistisk norsk navn.\n"
-        "- Maks fire setninger per melding. Respekter vanskelighetsgrad og brukers navn fra konteksten.\n"
-        "- Maks seks runder totalt; ved avslutning fyll inn 'scenarioresultat' og 'tilbakemelding'.\n"
-        "- Du kan delegere via handoffs til Scene Agent / Kunde Agent / Forbipasserende Agent / Kollega Agent for å komponere meldinger."
+        "Du er scenarieleder for en kriseøvelse ved Sit Kafe. Svar alltid på norsk. Returner KUN et JSON/dict som samsvarer med Schema 'ScenarioOutput' "
+        "med feltene: oppdrag (valgfritt), sjekkliste (valgfritt), meldinger (påkrevd), scenarioresultat (valgfritt), tilbakemelding (valgfritt). "
+        "Ingen kodeblokker, ingen metatekst. Følg reglene:\n"
+        "- Første tur (turn_count == '0'): returner nøyaktig TO meldinger i denne rekkefølgen: (1) Scene {name:'Scene', role:'system'} og (2) sint kunde {role:'customer'}. Bruk handoffs til Scene/Kunde for disse.\n"
+        "- Etter første tur: fortsett dialogen logisk basert på 'Brukerens siste svar' fra input. Produser normalt 1 melding (kunden). "
+        "  Hvis 'difficulty' er 'Medium' eller 'Vanskelig', kan du SOME ganger legge til ÉN ekstra kommentar fra forbipasserende ELLER kollega (aldri begge samtidig).\n"
+        "- Maks 4 setninger per melding. Bruk realistiske norske fornavn. Hvis det finnes 'user_name' i konteksten, kan kunden tiltale den ansatte ved dette navnet.\n"
+        "- Hold kontinuitet: behold samme sak og detaljer som tidligere. Ikke introduser ny informasjon som strider mot historikken.\n"
+        "- Oppdrag/sjekkliste (valgfritt): etter første tur kan du kort gi 'oppdrag.beskrivelse' (<=4 setninger) og 2–4 sjekklistepunkter for den ansatte (f.eks. 'Bekreft problemet', 'Hold rolig tone', 'Tilby konkret løsning').\n"
+        "- Slutt: senest innen 'max_turns' eller når konflikten er tydelig løst/feilet, fyll ut 'scenarioresultat' (1–2 setninger) og 'tilbakemelding' (1–3 setninger, konkret og hjelpsom). Ikke før.\n"
+        "- Delegér for meldingsinnhold via handoffs til Scene/Kunde/Forbipasserende/Kollega ved behov."
     ),
     handoffs=[scene_agent, customer_agent, bystander_agent, colleague_agent],
     input_guardrails=[InputGuardrail(guardrail_function=check_training_context)],
@@ -144,9 +158,10 @@ end_monitor_agent = Agent(
     name="Avslutningsvakt",
     handoff_description="Overvåker om scenariet skal avsluttes",
     instructions=(
-        "Analyser siste meldinger, vanskelighetsgrad og turn_count. Hvis turn_count >= 6, eller konflikten er løst/feilet, "
-        "returner should_end=true og fyll ut 'result' (1–2 setninger, norsk) og 'feedback' (1–3 setninger, norsk). "
-        "Ellers should_end=false."
+        "Returner KUN et JSON/dict med feltene: should_end (bool), result (valgfri tekst), feedback (valgfri tekst). "
+        "Vurder siste meldinger, 'difficulty', 'turn_count' og 'max_turns' fra konteksten. "
+        "Hvis turn_count >= max_turns eller konflikten virker tydelig løst/feilet, sett should_end=true og fyll 'result' (1–2 setninger, norsk) og 'feedback' (1–3 setninger, norsk og konstruktiv). "
+        "Ellers: should_end=false. Ingen kodeblokker."
     ),
     output_type=EndDecision,
 )
@@ -236,23 +251,25 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
     start_time = time.time()
     if stream_placeholder is not None:
         stream_placeholder.markdown(
-            "<div class='typing-indicator'><div class='typing-dots'>"
-            "<span></span><span></span><span></span></div>Genererer svar …</div>",
+            "<div class='typing-indicator'><span>Jobber</span> "
+            "<span class='typing-dots'><span></span><span></span><span></span></span>"
+            "</div>",
             unsafe_allow_html=True,
         )
 
-    async def _run():
-        ctx = {
+    def _ctx() -> Dict[str, str]:
+        return {
             "difficulty": str(st.session_state.get("difficulty", "")),
             "user_name": str(st.session_state.get("user_name", "")),
             "turn_count": str(st.session_state.get("turns", 0)),
             "max_turns": str(st.session_state.get("max_turns", 6)),
         }
-        result = await Runner.run(scenario_agent, compiled_input, context=ctx)
+
+    async def _run():
+        result = await Runner.run(scenario_agent, compiled_input, context=_ctx())
         return result.final_output
 
     raw_out = run_async(_run())
-
     # Robustly coerce the agent output into ScenarioOutput
     out: ScenarioOutput = coerce_scenario_output(raw_out)
 
@@ -277,7 +294,58 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
         st.session_state.last_meta = {}
 
     messages = out.meldinger or []
+    # On the very first turn we expect two messages: Scene (system) then a customer.
+    # Some models may occasionally only return the scene. If so, synthesize the
+    # first customer reply using the dedicated customer_agent to keep UX consistent.
     if is_initial:
+        try:
+            has_customer = any(getattr(m, "role", "") == "customer" for m in messages)
+            if not has_customer:
+                scene_text = ""
+                for m in messages:
+                    if getattr(m, "role", "") == "system" or str(getattr(m, "name", "")).strip().lower() in {"scene", "forteller"}:
+                        scene_text = m.content or ""
+                        break
+
+                async def _gen_customer() -> Optional[List[ScenarioMessage]]:
+                    prompt = (
+                        "Scenen som er satt:\n" + (scene_text or "Sit Kafe, en kunde er misfornøyd.") +
+                        "\n\nSkriv den første kundereplikken som matcher scenen."
+                    )
+                    res = await Runner.run(customer_agent, prompt, context=_ctx())
+                    out_val = res.final_output
+                    # Parse with the shared coercer and extract messages
+                    try:
+                        parsed = coerce_scenario_output(out_val)
+                        msgs = parsed.meldinger or []
+                    except Exception:
+                        msgs = []
+                    # If coercion fails, wrap the text as a customer line
+                    if not msgs:
+                        if isinstance(out_val, str) and out_val.strip():
+                            return [
+                                ScenarioMessage(
+                                    name="Kunde", role="customer", content=str(out_val).strip()
+                                )
+                            ]
+                    return msgs
+
+                new_msgs = run_async(_gen_customer())
+                if new_msgs:
+                    messages.extend(new_msgs)
+        except Exception:
+            # Graceful fallback: ensure at least a basic customer line exists
+            if not any(getattr(m, "role", "") == "customer" for m in messages):
+                messages.append(
+                    ScenarioMessage(
+                        name="Kunde",
+                        role="customer",
+                        content=(
+                            "Hei, dette er ikke greit. Jeg har ventet lenge og bestillingen min ble feil."
+                        ),
+                    )
+                )
+        # Keep only the first two messages for the bootstrap (Scene + Kunde)
         messages = messages[:2]
 
     for m in messages:
@@ -287,19 +355,13 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
     has_explicit_end = bool(out.scenarioresultat and out.tilbakemelding)
     if (not is_initial) and (not has_explicit_end):
         async def _monitor() -> EndDecision:
-            ctx = {
-                "difficulty": str(st.session_state.get("difficulty", "")),
-                "user_name": str(st.session_state.get("user_name", "")),
-                "turn_count": str(st.session_state.get("turns", 0)),
-                "max_turns": str(st.session_state.get("max_turns", 6)),
-            }
             summary = {
                 "meldinger": [m.dict() for m in out.meldinger] if out.meldinger else [],
                 "scenarioresultat": (out.scenarioresultat.dict() if out.scenarioresultat else None),
                 "tilbakemelding": (out.tilbakemelding.dict() if out.tilbakemelding else None),
             }
             monitor_input = json.dumps(summary, ensure_ascii=False)
-            res = await Runner.run(end_monitor_agent, monitor_input, context=ctx)
+            res = await Runner.run(end_monitor_agent, monitor_input, context=_ctx())
             out_val = res.final_output
             if isinstance(out_val, EndDecision):
                 return out_val

@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 from agents import set_default_openai_key
 
@@ -19,15 +20,28 @@ st.set_page_config(
 # Initialize session state via centralized defaults
 defaults = ensure_defaults(build_defaults())
 
-# If the user provided an API key, register it with the Agents SDK.
+# If the user provided an API key, prefer it; otherwise, use server key only after auth.
+# Prefer Streamlit Secrets on Community Cloud, fallback to env vars locally.
+server_key = (
+    (st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None)
+    or (st.secrets.get("SERVER_OPENAI_API_KEY") if hasattr(st, "secrets") else None)
+    or os.getenv("OPENAI_API_KEY")
+    or os.getenv("SERVER_OPENAI_API_KEY")
+)
+auth_required = bool(
+    (st.secrets.get("AUTH_PASSWORD") if hasattr(st, "secrets") else None)
+    or os.getenv("AUTH_PASSWORD")
+)
 api_key = st.session_state.get("api_key")
-if api_key:
-    try:
+try:
+    if api_key:
         # Avoid enabling tracing by default when using user-provided keys.
         set_default_openai_key(api_key, use_for_tracing=False)
-    except Exception:
-        # Silently ignore; downstream calls will error visibly if key is invalid.
-        pass
+    elif server_key and (not auth_required or st.session_state.get("authenticated")):
+        set_default_openai_key(server_key, use_for_tracing=False)
+except Exception:
+    # Silently ignore; downstream calls will error visibly if key is invalid.
+    pass
 
 
 # Simple router

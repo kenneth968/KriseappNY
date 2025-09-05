@@ -15,6 +15,7 @@ def build_defaults() -> Dict[str, Any]:
         "history": [],
         "ended": False,
         "started": False,
+        "authenticated": False,
         "user_name": "",
         "api_key": st.session_state.get("api_key", ""),
         "turns": 0,
