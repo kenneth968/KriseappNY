@@ -2,7 +2,6 @@ import json
 from typing import List, Dict
 
 import streamlit as st
-from streamlit_elements import elements, dashboard, mui
 
 from config import CONTEXT_MESSAGES, MAX_TURNS
 from model_api import call_model
@@ -53,6 +52,36 @@ def show(defaults: dict):
         },
     )
 
+    with st.container():
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            if st.button("Til start", icon=":material/home:", use_container_width=True):
+                st.session_state.page = "start"
+                st.rerun()
+        with c2:
+            if st.button(
+                "Nullstill", icon=":material/restart_alt:", use_container_width=True
+            ):
+                reset_to_start(defaults)
+                st.rerun()
+
+    if st.session_state.get("ended"):
+        with st.container():
+            st.success("Scenarioet er ferdig!")
+            if st.button(
+                "Se tilbakemelding",
+                type="primary",
+                icon=":material/feedback:",
+                use_container_width=True,
+            ):
+                st.session_state.page = "feedback"
+                st.rerun()
+    else:
+        progress_turns(
+            st.session_state.get("turns", 0),
+            st.session_state.get("max_turns", MAX_TURNS),
+        )
+
     # Bootstrap initial scene (use typing indicator only)
     if st.session_state.started and not st.session_state.history:
         compiled = _build_input(f"Start scenen for {st.session_state.user_name}.")
@@ -61,107 +90,50 @@ def show(defaults: dict):
         st.session_state.awaiting_user = True
         st.rerun()
 
-    if "chat_layout" not in st.session_state:
-        st.session_state.chat_layout = [
-            dashboard.Item("nav", 0, 0, 12, 1),
-            dashboard.Item("history", 0, 1, 12, 8),
-            dashboard.Item("input", 0, 9, 12, 3),
-        ]
+    # Render chat (hide meta on chat page)
+    render_history(show_meta=False)
 
-    def _update_layout(layout):
-        st.session_state.chat_layout = layout
+    if st.session_state.started and not st.session_state.ended:
+        if st.session_state.awaiting_user:
+            render_turn_banner()
+        placeholder = f"Skriv svaret ditt, {st.session_state.user_name or 'ansatt'}…"
+        user_text = st.chat_input(placeholder)
+        if user_text:
+            st.session_state.awaiting_user = False
+            user_msg = {
+                "name": st.session_state.user_name or "Ansatt",
+                "role": "employee",
+                "content": user_text,
+            }
+            st.session_state.history.append(user_msg)
+            # Immediate echo using the unified renderer
+            render_chat_message(user_msg["role"], user_msg["name"], user_msg["content"])
 
-    with elements("chat_layout"):
-        with dashboard.Grid(
-            st.session_state.chat_layout, onLayoutChange=_update_layout
-        ):
-            with mui.Card(key="nav", sx={"p": 1}):
-                c1, c2 = st.columns([1, 1])
-                with c1:
-                    if st.button(
-                        "Til start", icon=":material/home:", use_container_width=True
-                    ):
-                        st.session_state.page = "start"
-                        st.rerun()
-                with c2:
-                    if st.button(
-                        "Nullstill",
-                        icon=":material/restart_alt:",
-                        use_container_width=True,
-                    ):
-                        reset_to_start(defaults)
-                        st.rerun()
+            # Automatic end trigger: user types "end scenario" (or "avslutt scenario")
+            if user_text.strip().lower() in ("end scenario", "avslutt scenario"):
+                st.session_state.last_meta = {
+                    "scenarioresultat": {
+                        "name": "Scenarioresultat",
+                        "role": "system",
+                        "content": "Scenarioet ble avsluttet av brukeren.",
+                    },
+                    "tilbakemelding": {
+                        "name": "Tilbakemelding",
+                        "role": "system",
+                        "content": "Du avsluttet øvelsen manuelt. Reflekter kort over hva som fungerte og hva du vil forbedre neste gang.",
+                    },
+                }
+                st.session_state.ended = True
+                st.session_state.awaiting_user = False
+                st.rerun()
 
-            with mui.Card(key="history", sx={"p": 1, "overflowY": "auto"}):
-                render_history(show_meta=False)
-
-            with mui.Card(key="input", sx={"p": 1}):
-                if st.session_state.get("ended"):
-                    st.success("Scenarioet er ferdig!")
-                    if st.button(
-                        "Se tilbakemelding",
-                        type="primary",
-                        icon=":material/feedback:",
-                        use_container_width=True,
-                    ):
-                        st.session_state.page = "feedback"
-                        st.rerun()
-                else:
-                    progress_turns(
-                        st.session_state.get("turns", 0),
-                        st.session_state.get("max_turns", MAX_TURNS),
-                    )
-                    if st.session_state.started and not st.session_state.ended:
-                        if st.session_state.awaiting_user:
-                            render_turn_banner()
-                        placeholder = f"Skriv svaret ditt, {st.session_state.user_name or 'ansatt'}…"
-                        user_text = st.chat_input(placeholder)
-                        if user_text:
-                            st.session_state.awaiting_user = False
-                            user_msg = {
-                                "name": st.session_state.user_name or "Ansatt",
-                                "role": "employee",
-                                "content": user_text,
-                            }
-                            st.session_state.history.append(user_msg)
-                            # Immediate echo using the unified renderer
-                            render_chat_message(
-                                user_msg["role"], user_msg["name"], user_msg["content"]
-                            )
-
-                            # Automatic end trigger: user types "end scenario" (or "avslutt scenario")
-                            if user_text.strip().lower() in (
-                                "end scenario",
-                                "avslutt scenario",
-                            ):
-                                st.session_state.last_meta = {
-                                    "scenarioresultat": {
-                                        "name": "Scenarioresultat",
-                                        "role": "system",
-                                        "content": "Scenarioet ble avsluttet av brukeren.",
-                                    },
-                                    "tilbakemelding": {
-                                        "name": "Tilbakemelding",
-                                        "role": "system",
-                                        "content": "Du avsluttet øvelsen manuelt. Reflekter kort over hva som fungerte og hva du vil forbedre neste gang.",
-                                    },
-                                }
-                                st.session_state.ended = True
-                                st.session_state.awaiting_user = False
-                                st.rerun()
-
-                            st.session_state.turns += 1
-                            compiled = _build_input(user_text)
-                            ai_messages = call_model(
-                                compiled, stream_placeholder=st.empty()
-                            )
-                            st.session_state.history.extend(ai_messages)
-                            if (
-                                _check_end(ai_messages)
-                                or st.session_state.turns >= MAX_TURNS
-                            ):
-                                st.session_state.ended = True
-                                st.session_state.awaiting_user = False
-                            else:
-                                st.session_state.awaiting_user = True
-                            st.rerun()
+            st.session_state.turns += 1
+            compiled = _build_input(user_text)
+            ai_messages = call_model(compiled, stream_placeholder=st.empty())
+            st.session_state.history.extend(ai_messages)
+            if _check_end(ai_messages) or st.session_state.turns >= MAX_TURNS:
+                st.session_state.ended = True
+                st.session_state.awaiting_user = False
+            else:
+                st.session_state.awaiting_user = True
+            st.rerun()
