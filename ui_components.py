@@ -11,6 +11,25 @@ def inject_css():
     st.markdown(
         """
         <style>
+        /* Constrain overall content width for readability */
+        .block-container { max-width: 900px; }
+
+        /* Tighter, consistent message width and spacing */
+        [data-testid="stChatMessage"] {
+            max-width: 720px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        [data-testid="stChatMessage"] > div { gap: 6px; }
+        [data-testid="stChatMessage"] .msg-header {
+            font-weight: 600;
+            color: #94a3b8; /* slate-400 */
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+        /* Make system info/success/warning boxes narrower as well */
+        [data-testid="stAlert"] { max-width: 720px; margin-left:auto; margin-right:auto; }
+
         .typing-indicator {
             display: inline-flex;
             align-items: center;
@@ -226,8 +245,8 @@ def render_chat_message(role: str, name: str, content: str) -> None:
     header_text = display_name if is_self else f"{display_name} ({role_label(role)})"
 
     with st.chat_message(streamlit_role, avatar=theme["avatar"]):
-        # Use Streamlit's default theme colors for readability
-        st.markdown(f"**{header_text}**")
+        # Subtle header then message body
+        st.markdown(f"<div class='msg-header'>{header_text}</div>", unsafe_allow_html=True)
         st.markdown(content)
 
 
@@ -282,7 +301,7 @@ def stream_chat_message(role: str, name: str, content: str) -> None:
     header_text = display_name if is_self else f"{display_name} ({role_label(role)})"
 
     with st.chat_message(streamlit_role, avatar=theme["avatar"]):
-        st.markdown(f"**{header_text}**")
+        st.markdown(f"<div class='msg-header'>{header_text}</div>", unsafe_allow_html=True)
         if hasattr(st, "write_stream"):
             st.write_stream(_stream_chunks(content))
         else:
