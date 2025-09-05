@@ -6,7 +6,6 @@ from typing import List, Dict, Optional, Literal
 import streamlit as st
 from pydantic import BaseModel, Field
 
-from config import MIN_STREAM_TIME_SEC
 from async_utils import run_async
 
 # Agents framework
@@ -247,15 +246,8 @@ def coerce_scenario_output(val) -> ScenarioOutput:
 
 
 def call_model(compiled_input: str, stream_placeholder: Optional[object] = None) -> List[Dict]:
-    # Show typing indicator right away
+    # Non-streaming model call (streaming is handled in the UI via st.write_stream)
     start_time = time.time()
-    if stream_placeholder is not None:
-        stream_placeholder.markdown(
-            "<div class='typing-indicator'><span>Jobber</span> "
-            "<span class='typing-dots'><span></span><span></span><span></span></span>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
 
     def _ctx() -> Dict[str, str]:
         return {
@@ -273,10 +265,7 @@ def call_model(compiled_input: str, stream_placeholder: Optional[object] = None)
     # Robustly coerce the agent output into ScenarioOutput
     out: ScenarioOutput = coerce_scenario_output(raw_out)
 
-    # Minimum indicator time for perceived streaming feel
-    elapsed = time.time() - start_time
-    if stream_placeholder is not None and elapsed < MIN_STREAM_TIME_SEC:
-        time.sleep(MIN_STREAM_TIME_SEC - elapsed)
+    # No artificial delay; UI handles streaming presentation
 
     # Build cleaned messages and optional meta
     cleaned: List[Dict] = []

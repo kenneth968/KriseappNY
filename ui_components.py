@@ -7,39 +7,10 @@ from config import PERSONA_THEME, ROLE_TO_FALLBACK_NAME, ROLE_LABEL_NB
 
 
 def inject_css():
-    # Minimal CSS for pulsing turn indicator and typing dots.
+    # Minimal CSS for pulsing turn indicator.
     st.markdown(
         """
         <style>
-        .typing-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 10px;
-            border-radius: 10px;
-            background: #f9f7f3; /* off-white */
-            border: 1px solid #b5e2fa; /* light blue */
-            color: #334155; /* slate */
-            font-weight: 600;
-            width: fit-content;
-            margin: 6px auto 8px auto;
-        }
-        .typing-dots { display: inline-flex; gap: 3px; }
-        .typing-dots span {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #334155;
-            display: inline-block;
-            animation: typingBlink 1.2s ease-in-out infinite;
-        }
-        .typing-dots span:nth-child(2) { animation-delay: .2s; }
-        .typing-dots span:nth-child(3) { animation-delay: .4s; }
-        @keyframes typingBlink {
-            0% { opacity: .2; transform: translateY(0); }
-            50% { opacity: 1; transform: translateY(-2px); }
-            100% { opacity: .2; transform: translateY(0); }
-        }
         .turn-indicator {
             display: flex;
             align-items: center;
@@ -222,6 +193,64 @@ def render_chat_message(role: str, name: str, content: str) -> None:
         # Use Streamlit's default theme colors for readability
         st.markdown(f"**{header_text}**")
         st.markdown(content)
+
+
+def _stream_chunks(text: str, chunk_size: int = 40):
+    if not text:
+        return
+    for i in range(0, len(text), chunk_size):
+        yield text[i : i + chunk_size]
+
+
+def stream_chat_message(role: str, name: str, content: str) -> None:
+    """Render a chat message using st.write_stream for progressive display."""
+    user_name = st.session_state.get("user_name", "")
+    persona_name = (name or ROLE_TO_FALLBACK_NAME.get(role, "")).strip() or "_default"
+    role_theme_key = {
+        "customer": "Kunde",
+        "student": "Student",
+        "employee": "Kollega",
+        "bystander": "Bystander",
+        "system": "Scene",
+    }.get(role, "_default")
+    theme = PERSONA_THEME.get(role_theme_key, PERSONA_THEME["_default"])
+    if user_name and persona_name == user_name and role == "employee":
+        theme = PERSONA_THEME["_you"]
+
+    display_name = sanitize_name(persona_name, role)
+
+    # System center boxes are not streamed; render directly
+    if role == "system" and persona_name in ("Scene", "Forteller"):
+        render_center_box("scene", content)
+        return
+    if role == "system" and persona_name in ("Scenario-resultat", "Scenarioresultat"):
+        render_center_box("result", content)
+        return
+    if role == "system" and persona_name == "Tilbakemelding":
+        render_center_box("feedback", content)
+        return
+
+    streamlit_role = _role_to_streamlit(role, persona_name, user_name)
+    is_self = streamlit_role == "user"
+
+    # Stabilize persona names across the session
+    if not is_self:
+        fixed_key = f"_fixed_name_{role}"
+        fixed = st.session_state.get(fixed_key)
+        if fixed:
+            display_name = fixed
+        else:
+            if _is_generic_name(display_name, role):
+                display_name = _get_or_create_role_random_name(role)
+            st.session_state[fixed_key] = display_name
+    header_text = display_name if is_self else f"{display_name} ({role_label(role)})"
+
+    with st.chat_message(streamlit_role, avatar=theme["avatar"]):
+        st.markdown(f"**{header_text}**")
+        if hasattr(st, "write_stream"):
+            st.write_stream(_stream_chunks(content))
+        else:
+            st.markdown(content)
 
 
 def render_history(show_meta: bool = True) -> None:

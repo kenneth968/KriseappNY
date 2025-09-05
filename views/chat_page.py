@@ -11,6 +11,7 @@ from ui_components import (
     page_header,
     progress_turns,
     render_chat_message,
+    stream_chat_message,
 )
 from state import reset_to_start
 
@@ -85,8 +86,15 @@ def show(defaults: dict):
     # Bootstrap initial scene (use typing indicator only)
     if st.session_state.started and not st.session_state.history:
         compiled = _build_input(f"Start scenen for {st.session_state.user_name}.")
-        initial = call_model(compiled, stream_placeholder=st.empty())
-        st.session_state.history.extend(initial)
+        initial = call_model(compiled)
+        # Stream initial messages
+        for m in initial:
+            # Stream non-system messages; render system (scene) normally
+            if m.get("role") == "system" and m.get("name") in ("Scene", "Forteller"):
+                render_chat_message(m["role"], m["name"], m["content"])
+            else:
+                stream_chat_message(m["role"], m["name"], m["content"])
+            st.session_state.history.append(m)
         st.session_state.awaiting_user = True
         st.rerun()
 
@@ -129,8 +137,14 @@ def show(defaults: dict):
 
             st.session_state.turns += 1
             compiled = _build_input(user_text)
-            ai_messages = call_model(compiled, stream_placeholder=st.empty())
-            st.session_state.history.extend(ai_messages)
+            ai_messages = call_model(compiled)
+            # Stream AI messages as they arrive
+            for m in ai_messages:
+                if m.get("role") == "system" and m.get("name") in ("Scenario-resultat", "Scenarioresultat", "Tilbakemelding"):
+                    render_chat_message(m["role"], m["name"], m["content"])
+                else:
+                    stream_chat_message(m["role"], m["name"], m["content"])
+                st.session_state.history.append(m)
             if _check_end(ai_messages) or st.session_state.turns >= MAX_TURNS:
                 st.session_state.ended = True
                 st.session_state.awaiting_user = False
