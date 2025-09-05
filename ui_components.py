@@ -87,6 +87,21 @@ def page_header(title: str, subtitle: str = "", badges: Dict[str, str] | None = 
         st.markdown(chips, unsafe_allow_html=True)
 
 
+def chip(label: str, value: str) -> None:
+    """Render a small inline badge for key-value pairs.
+
+    Kept minimal and self-contained so it works even if themed CSS is missing.
+    """
+    style = (
+        "display:inline-block;padding:2px 8px;border-radius:10px;"
+        "background:#f1f5f9;color:#334155;font-size:0.8rem;margin-right:6px;"
+    )
+    st.markdown(
+        f"<span class='chip chip-muted' style='{style}'>{label}: <b>{value}</b></span>",
+        unsafe_allow_html=True,
+    )
+
+
 def progress_turns(turns: int, max_turns: int) -> None:
     pct = 0 if max_turns <= 0 else min(1.0, max(0.0, turns / float(max_turns)))
     st.progress(pct, text=f"Runde {turns} av {max_turns}")
